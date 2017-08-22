@@ -1,4 +1,5 @@
-from __future__ import division
+#! /usr/bin/env python
+
 import math
 import operator
 import time
@@ -7,7 +8,9 @@ import copy
 import sys
 import ast
 import csv
+import random
 from collections import Counter
+from sklearn.model_selection import KFold
 
 
 ##################################################
@@ -16,8 +19,9 @@ from collections import Counter
 class data():
   def __init__(self, classifier):
     self.examples = []
+    self.balanced_examples = []
     self.attributes = []
-    self.attr_types = []
+    #self.attr_types = []
     self.classifier = classifier
     self.class_index = None
 
@@ -35,40 +39,43 @@ def read_data(dataset, datafile, datatypes):
   dataset.attributes = dataset.examples.pop(0)
 
   
-  #create array that indicates whether each attribute is a numerical value or not
-  attr_type = open(datatypes) 
-  orig_file = attr_type.read()
-  dataset.attr_types = orig_file.split(',')
+  ##create array that indicates whether each attribute is a numerical value or not
+  #attr_type = open(datatypes) 
+  #orig_file = attr_type.read()
+  #dataset.attr_types = orig_file.split(',')
 
 ##################################################
 # Preprocess dataset
 ##################################################
-def preprocess2(dataset):
+def preprocess2(dataset, pos, neg, balanced, multiple_class1=1):
   print "Preprocessing data..."
 
+  negative = neg
+  positive = pos
   class_values = [example[dataset.class_index] for example in dataset.examples]
   class_mode = Counter(class_values)
+  num_positive = class_mode[positive]
   class_mode = class_mode.most_common(1)[0][0]
             
   for attr_index in range(len(dataset.attributes)):
 
-    ex_0class = filter(lambda x: x[dataset.class_index] == '0', dataset.examples)
+    ex_0class = filter(lambda x: x[dataset.class_index] == negative, dataset.examples)
     values_0class = [example[attr_index] for example in ex_0class]  
              
-    ex_1class = filter(lambda x: x[dataset.class_index] == '1', dataset.examples)
+    ex_1class = filter(lambda x: x[dataset.class_index] == positive, dataset.examples)
     values_1class = [example[attr_index] for example in ex_1class]
         
     values = Counter(values_0class)
     value_counts = values.most_common()
     
     mode0 = values.most_common(1)[0][0]
-    if mode0 == '?':
+    if mode0 == '?' or mode0 == '':
       mode0 = values.most_common(2)[1][0]
 
     values = Counter(values_1class)
     mode1 = values.most_common(1)[0][0]
     
-    if mode1 == '?':
+    if mode1 == '?' or mode1 == '':
       mode1 = values.most_common(2)[1][0]
 
     mode_01 = [mode0, mode1]
@@ -77,19 +84,38 @@ def preprocess2(dataset):
     attr_modes[attr_index] = mode_01
     
     for example in dataset.examples:
-      if (example[attr_index] == '?'):
-        if (example[dataset.class_index] == '0'):
+      if (example[attr_index] == '?' or example[attr_index] == ''):
+        if (example[dataset.class_index] == negative):
           example[attr_index] = attr_modes[attr_index][0]
-        elif (example[dataset.class_index] == '1'):
+        elif (example[dataset.class_index] == positive):
           example[attr_index] = attr_modes[attr_index][1]
         else:
+          print "No label for this example"
           example[attr_index] = class_mode
 
     #convert attributes that are numeric to floats
     for example in dataset.examples:
       for x in range(len(dataset.examples[0])):
-        if dataset.attributes[x] == 'True':
-          example[x] = float(example[x])
+        #if dataset.attributes[x] == 'True':
+        print example[x]
+        example[x] = float(example[x])
+
+  # Get balanced data set
+  pos_index_list = []
+  neg_index_list = []
+  keep_index_list = []
+  if balanced == True:
+    count = 0
+    for i in range(len(dataset.examples)):
+      if (example[i][dataset.class_index] == positive):
+        pos_index_list.append(i)
+      if (example[i][dataset.class_index] == positive) and (count < num_positive * multiple_class1):
+        neg_index_list.append(i)
+        count += 1
+    keep_index_list = pos_index_list + neg_index_list
+    dataset.balanced_examples = [ dataset.examples[i] for i in keep_index_list ]
+    
+
 
 ##################################################
 # tree node class that will make up the tree
@@ -143,8 +169,9 @@ def compute_tree(dataset, parent_node, classifier):
   attr_to_split = None # The index of the attribute we will split on
   max_gain = 0 # The gain given by the best attribute
   split_val = None 
-  min_gain = 0.01
+  #min_gain = 0.01
   #dataset_entropy = calc_dataset_entropy(dataset, classifier)
+  min_gain = 0.01
   dataset_auc = 0.5
   for attr_index in range(len(dataset.examples[0])):
 
@@ -180,7 +207,7 @@ def compute_tree(dataset, parent_node, classifier):
   #attr_to_split is now the best attribute according to our gain metric
   if (split_val is None or attr_to_split is None):
     print "Something went wrong. Couldn't find an attribute to split on or a split value."
-  elif (max_gain <= min_gain or node.height > 20):
+  elif (max_gain <= min_gain or node.height > 50):
 
     node.is_leaf = True
     node.classification = classify_leaf(dataset, classifier)
@@ -216,9 +243,9 @@ def classify_leaf(dataset, classifier):
   total = len(dataset.examples)
   zeroes = total - ones
   if (ones >= zeroes):
-    return 1
+    return 2
   else:
-    return 0
+    return 1
 
 ##################################################
 # Calculate the entropy of the current dataset
@@ -392,14 +419,14 @@ def validate_example(node, example):
 ##################################################
 # Test example
 ##################################################
-def test_example(example, node, class_index):
+def test_example(example, node):
   if (node.is_leaf == True):
     return node.classification
   else:
     if (example[node.attr_split_index] >= node.attr_split_value):
-      return test_example(example, node.upper_child, class_index)
+      return test_example(example, node.upper_child)
     else:
-      return test_example(example, node.lower_child, class_index)
+      return test_example(example, node.lower_child)
 
 ##################################################
 # Print tree
@@ -454,12 +481,14 @@ def main():
   else:
     datafile = args[1]
     dataset = data("")
-    if ("-d" in args):
-      datatypes = args[args.index("-d") + 1]
-    else:
-      datatypes = 'datatypes.csv'
+    #if ("-d" in args):
+    #  datatypes = args[args.index("-d") + 1]
+    #else:
+    #  datatypes = 'datatypes.csv'
+    # TBD make use of the datatypes
+    datatypes = None
     read_data(dataset, datafile, datatypes)
-    arg3 = args[2]
+    arg3 = "PPTERM"
     if (arg3 in dataset.attributes):
       classifier = arg3
     else:
@@ -474,60 +503,104 @@ def main():
       else:
         dataset.class_index = range(len(dataset.attributes))[-1]
         
-    unprocessed = copy.deepcopy(dataset)
-    preprocess2(dataset)
+    balanced = False
+    preprocess2(dataset, '2', '1', balanced)
 
-    print "Computing tree..."
-    root = compute_tree(dataset, None, classifier) 
-    if ("-s" in args):
-      print_disjunctive(root, dataset, "")
-      print "\n"
-    if ("-v" in args):
-      datavalidate = args[args.index("-v") + 1]
-      print "Validating tree..."
-
-      validateset = data(classifier)
-      read_data(validateset, datavalidate, datatypes)
-      for a in range(len(dataset.attributes)):
-        if validateset.attributes[a] == validateset.classifier:
-          validateset.class_index = a
-        else:
-          validateset.class_index = range(len(validateset.attributes))[-1]
-      preprocess2(validateset)
-      best_score = validate_tree(root, validateset)
-      all_ex_score = copy.deepcopy(best_score)
-      print "Initial (pre-pruning) validation set score: " + str(100*best_score) +"%"
-    if ("-p" in args):
-      if("-v" not in args):
-        print "Error: You must validate if you want to prune"
+    # Split the data set into training and test set
+    training_dataset = data(classifier)
+    test_dataset = data(classifier)
+    training_dataset.attributes = dataset.attributes
+    test_dataset.attributes = dataset.attributes
+    #training_dataset.attr_types = dataset.attr_types
+    #test_dataset.attr_types = dataset.attr_types
+    for a in range(len(dataset.attributes)):
+      if training_dataset.attributes[a] == training_dataset.classifier:
+        training_dataset.class_index = a
       else:
-        post_prune_accuracy = 100*prune_tree(root, root, validateset, best_score)
-        print "Post-pruning score on validation set: " + str(post_prune_accuracy) + "%"
-    if ("-t" in args):
-      datatest = args[args.index("-t") + 1]
-      testset = data(classifier)
-      read_data(testset, datatest, datatypes)
-      for a in range(len(dataset.attributes)):
-        if testset.attributes[a] == testset.classifier:
-          testset.class_index = a
-        else:
-          testset.class_index = range(len(testset.attributes))[-1]
-      print "Testing model on " + str(datatest)
-      for example in testset.examples:
-        example[testset.class_index] = '0'
-      testset.examples[0][testset.class_index] = '1'
-      testset.examples[1][testset.class_index] = '1'
-      testset.examples[2][testset.class_index] = '?'
-      preprocess2(testset)
-      b = open('results.csv', 'w')
-      a = csv.writer(b)
-      for example in testset.examples:
-        example[testset.class_index] = test_example(example, root, testset.class_index)
-      saveset = testset
-      saveset.examples = [saveset.attributes] + saveset.examples
-      a.writerows(saveset.examples)
-      b.close()
-      print "Testing complete. Results outputted to results.csv"
+        training_dataset.class_index = range(len(training_dataset.attributes))[-1]
+    for a in range(len(dataset.attributes)):
+      if teset_dataset.attributes[a] == teset_dataset.classifier:
+        teset_dataset.class_index = a
+      else:
+        teset_dataset.class_index = range(len(teset_dataset.attributes))[-1]
+
+
+    n_folds = 10
+    cv_arg = KFold(n_folds, shuffle=True)
+    root = None
+    results = []
+    if balance == True:
+      random.shuffle(dataset.balanced_examples)
+      for train_idx, test_idx in cv_arg.split(np.array(dataset.balanced_examples)):
+        training_dataset.examples = [ dataset.balanced_examples[i] for i in train_idx ]
+        test_dataset.examples = [ dataset.balanced_examples[i] for i in test_idx ]
+        print "Computing tree..."
+        root = compute_tree(training_dataset, None, classifier)
+        for example in test_dataset.examples:
+          results.append(test_example(example, root))
+    else:
+      random.shuffle(dataset.examples)
+      for train_idx, test_idx in cv_arg.split(np.array(dataset.examples)):
+        training_dataset.examples = [ dataset.examples[i] for i in train_idx ]
+        test_dataset.examples = [ dataset.examples[i] for i in test_idx ]
+        print "Computing tree..."
+        root = compute_tree(training_dataset, None, classifier) 
+        for example in test_dataset.examples:
+          results.append(test_example(example, root))
+
+    print results
+    ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
+    print ground_truth
+
+    #if ("-s" in args):
+    #  print_disjunctive(root, dataset, "")
+    #  print "\n"
+    #if ("-v" in args):
+    #  datavalidate = args[args.index("-v") + 1]
+    #  print "Validating tree..."
+
+    #  validateset = data(classifier)
+    #  read_data(validateset, datavalidate, datatypes)
+    #  for a in range(len(dataset.attributes)):
+    #    if validateset.attributes[a] == validateset.classifier:
+    #      validateset.class_index = a
+    #    else:
+    #      validateset.class_index = range(len(validateset.attributes))[-1]
+    #  preprocess2(validateset)
+    #  best_score = validate_tree(root, validateset)
+    #  all_ex_score = copy.deepcopy(best_score)
+    #  print "Initial (pre-pruning) validation set score: " + str(100*best_score) +"%"
+    #if ("-p" in args):
+    #  if("-v" not in args):
+    #    print "Error: You must validate if you want to prune"
+    #  else:
+    #    post_prune_accuracy = 100*prune_tree(root, root, validateset, best_score)
+    #    print "Post-pruning score on validation set: " + str(post_prune_accuracy) + "%"
+    #if ("-t" in args):
+    #  datatest = args[args.index("-t") + 1]
+    #  testset = data(classifier)
+    #  read_data(testset, datatest, datatypes)
+    #  for a in range(len(dataset.attributes)):
+    #    if testset.attributes[a] == testset.classifier:
+    #      testset.class_index = a
+    #    else:
+    #      testset.class_index = range(len(testset.attributes))[-1]
+    #  print "Testing model on " + str(datatest)
+    #  for example in testset.examples:
+    #    example[testset.class_index] = '0'
+    #  testset.examples[0][testset.class_index] = '1'
+    #  testset.examples[1][testset.class_index] = '1'
+    #  testset.examples[2][testset.class_index] = '?'
+    #  preprocess2(testset)
+    #  b = open('results.csv', 'w')
+    #  a = csv.writer(b)
+    #  for example in testset.examples:
+    #    example[testset.class_index] = test_example(example, root, testset.class_index)
+    #  saveset = testset
+    #  saveset.examples = [saveset.attributes] + saveset.examples
+    #  a.writerows(saveset.examples)
+    #  b.close()
+    #  print "Testing complete. Results outputted to results.csv"
       
 if __name__ == "__main__":
   main()
