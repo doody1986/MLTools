@@ -10,6 +10,7 @@ import ast
 import csv
 import random
 from collections import Counter
+import numpy as np
 from sklearn.model_selection import KFold
 
 
@@ -56,7 +57,7 @@ def preprocess2(dataset, pos, neg, balanced, multiple_class1=1):
   class_mode = Counter(class_values)
   num_positive = class_mode[positive]
   class_mode = class_mode.most_common(1)[0][0]
-            
+
   for attr_index in range(len(dataset.attributes)):
 
     ex_0class = filter(lambda x: x[dataset.class_index] == negative, dataset.examples)
@@ -95,10 +96,8 @@ def preprocess2(dataset, pos, neg, balanced, multiple_class1=1):
 
     #convert attributes that are numeric to floats
     for example in dataset.examples:
-      for x in range(len(dataset.examples[0])):
-        #if dataset.attributes[x] == 'True':
-        print example[x]
-        example[x] = float(example[x])
+      #if dataset.attributes[x] == 'True':
+      example[attr_index] = float(example[attr_index])
 
   # Get balanced data set
   pos_index_list = []
@@ -157,11 +156,11 @@ def compute_tree(dataset, parent_node, classifier):
 
   ones = one_count(dataset.examples, dataset.attributes, classifier)
   if (len(dataset.examples) == ones):
-    node.classification = 1
+    node.classification = 2
     node.is_leaf = True
     return node
   elif (ones == 0):
-    node.classification = 0
+    node.classification = 1
     node.is_leaf = True
     return node
   else:
@@ -222,8 +221,8 @@ def compute_tree(dataset, parent_node, classifier):
   lower_dataset = data(classifier)
   upper_dataset.attributes = dataset.attributes
   lower_dataset.attributes = dataset.attributes
-  upper_dataset.attr_types = dataset.attr_types
-  lower_dataset.attr_types = dataset.attr_types
+  #upper_dataset.attr_types = dataset.attr_types
+  #lower_dataset.attr_types = dataset.attr_types
   for example in dataset.examples:
     if (attr_to_split is not None and example[attr_to_split] >= split_val):
       upper_dataset.examples.append(example)
@@ -303,8 +302,8 @@ def calc_gain_auc(dataset, auc, val, attr_index):
   gain_lower_dataset = data(classifier)
   gain_upper_dataset.attributes = dataset.attributes
   gain_lower_dataset.attributes = dataset.attributes
-  gain_upper_dataset.attr_types = dataset.attr_types
-  gain_lower_dataset.attr_types = dataset.attr_types
+  #gain_upper_dataset.attr_types = dataset.attr_types
+  #gain_lower_dataset.attr_types = dataset.attr_types
   for example in dataset.examples:
     if (example[attr_index] >= val):
       gain_upper_dataset.examples.append(example)
@@ -316,7 +315,7 @@ def calc_gain_auc(dataset, auc, val, attr_index):
 
   num_total = len(dataset.examples);
   num_postive = one_count(dataset.examples, dataset.attributes, classifier)
-  num_negative = num_total_examples - num_postive
+  num_negative = num_total - num_postive
   num_total_lower_dataset = len(gain_lower_dataset.examples);
   num_postive_lower_dataset = one_count(gain_lower_dataset.examples, gain_lower_dataset.attributes, classifier)
   num_negative_lower_dataset = num_total_lower_dataset - num_postive_lower_dataset
@@ -346,7 +345,7 @@ def one_count(instances, attributes, classifier):
     else:
       class_index = len(attributes) - 1
   for i in instances:
-    if i[class_index] == "1":
+    if i[class_index] == 2:
       count += 1
   return count
 
@@ -519,38 +518,44 @@ def main():
       else:
         training_dataset.class_index = range(len(training_dataset.attributes))[-1]
     for a in range(len(dataset.attributes)):
-      if teset_dataset.attributes[a] == teset_dataset.classifier:
-        teset_dataset.class_index = a
+      if test_dataset.attributes[a] == test_dataset.classifier:
+        test_dataset.class_index = a
       else:
-        teset_dataset.class_index = range(len(teset_dataset.attributes))[-1]
+        test_dataset.class_index = range(len(test_dataset.attributes))[-1]
 
 
     n_folds = 10
     cv_arg = KFold(n_folds, shuffle=True)
     root = None
-    results = []
-    if balance == True:
+    if balanced == True:
       random.shuffle(dataset.balanced_examples)
       for train_idx, test_idx in cv_arg.split(np.array(dataset.balanced_examples)):
+        results = []
         training_dataset.examples = [ dataset.balanced_examples[i] for i in train_idx ]
         test_dataset.examples = [ dataset.balanced_examples[i] for i in test_idx ]
         print "Computing tree..."
         root = compute_tree(training_dataset, None, classifier)
         for example in test_dataset.examples:
           results.append(test_example(example, root))
+        print results
+        ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
+        print ground_truth
     else:
       random.shuffle(dataset.examples)
       for train_idx, test_idx in cv_arg.split(np.array(dataset.examples)):
+        results = []
         training_dataset.examples = [ dataset.examples[i] for i in train_idx ]
         test_dataset.examples = [ dataset.examples[i] for i in test_idx ]
         print "Computing tree..."
         root = compute_tree(training_dataset, None, classifier) 
+        print_tree(root)
         for example in test_dataset.examples:
           results.append(test_example(example, root))
+        print results
+        ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
+        print ground_truth
 
-    print results
-    ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
-    print ground_truth
+
 
     #if ("-s" in args):
     #  print_disjunctive(root, dataset, "")
