@@ -106,9 +106,9 @@ def preprocess2(dataset, pos, neg, balanced, multiple_class1=1):
   if balanced == True:
     count = 0
     for i in range(len(dataset.examples)):
-      if (example[i][dataset.class_index] == positive):
+      if (dataset.examples[i][dataset.class_index] == float(positive)):
         pos_index_list.append(i)
-      if (example[i][dataset.class_index] == positive) and (count < num_positive * multiple_class1):
+      if (dataset.examples[i][dataset.class_index] == float(negative)) and (count < num_positive * multiple_class1):
         neg_index_list.append(i)
         count += 1
     keep_index_list = pos_index_list + neg_index_list
@@ -168,9 +168,9 @@ def compute_tree(dataset, parent_node, classifier):
   attr_to_split = None # The index of the attribute we will split on
   max_gain = 0 # The gain given by the best attribute
   split_val = None 
-  #min_gain = 0.01
-  #dataset_entropy = calc_dataset_entropy(dataset, classifier)
   min_gain = 0.01
+  dataset_entropy = calc_dataset_entropy(dataset, classifier)
+  #min_gain = 0.01
   dataset_auc = 0.5
   for attr_index in range(len(dataset.examples[0])):
 
@@ -206,7 +206,7 @@ def compute_tree(dataset, parent_node, classifier):
   #attr_to_split is now the best attribute according to our gain metric
   if (split_val is None or attr_to_split is None):
     print "Something went wrong. Couldn't find an attribute to split on or a split value."
-  elif (max_gain <= min_gain or node.height > 50):
+  elif (max_gain <= min_gain or node.height > 20):
 
     node.is_leaf = True
     node.classification = classify_leaf(dataset, classifier)
@@ -275,8 +275,8 @@ def calc_gain(dataset, entropy, val, attr_index):
   gain_lower_dataset = data(classifier)
   gain_upper_dataset.attributes = dataset.attributes
   gain_lower_dataset.attributes = dataset.attributes
-  gain_upper_dataset.attr_types = dataset.attr_types
-  gain_lower_dataset.attr_types = dataset.attr_types
+  #gain_upper_dataset.attr_types = dataset.attr_types
+  #gain_lower_dataset.attr_types = dataset.attr_types
   for example in dataset.examples:
     if (example[attr_index] >= val):
       gain_upper_dataset.examples.append(example)
@@ -314,21 +314,21 @@ def calc_gain_auc(dataset, auc, val, attr_index):
     return -1
 
   num_total = len(dataset.examples);
-  num_postive = one_count(dataset.examples, dataset.attributes, classifier)
-  num_negative = num_total - num_postive
+  num_positive = one_count(dataset.examples, dataset.attributes, classifier)
+  num_negative = num_total - num_positive
   num_total_lower_dataset = len(gain_lower_dataset.examples);
-  num_postive_lower_dataset = one_count(gain_lower_dataset.examples, gain_lower_dataset.attributes, classifier)
-  num_negative_lower_dataset = num_total_lower_dataset - num_postive_lower_dataset
+  num_positive_lower_dataset = one_count(gain_lower_dataset.examples, gain_lower_dataset.attributes, classifier)
+  num_negative_lower_dataset = num_total_lower_dataset - num_positive_lower_dataset
   num_total_upper_dataset = len(gain_upper_dataset.examples);
-  num_postive_upper_dataset = one_count(gain_upper_dataset.examples, gain_upper_dataset.attributes, classifier)
-  num_negative_upper_dataset = num_total_upper_dataset - num_postive_upper_dataset
+  num_positive_upper_dataset = one_count(gain_upper_dataset.examples, gain_upper_dataset.attributes, classifier)
+  num_negative_upper_dataset = num_total_upper_dataset - num_positive_upper_dataset
 
-  lpr_lower = num_postive_lower_dataset / num_total_lower_dataset
-  lpr_upper = num_postive_upper_dataset / num_total_upper_dataset
+  lpr_lower = float(num_positive_lower_dataset) / float(num_total_lower_dataset)
+  lpr_upper = float(num_positive_upper_dataset) / float(num_total_upper_dataset)
   if lpr_lower > lpr_upper:  
-    attr_auc += (num_postive_upper_dataset * num_negative + num_postive * num_negative_lower_dataset) / (2 * num_postive * num_negative)
+    attr_auc += float(num_positive_upper_dataset * num_negative + num_positive * num_negative_lower_dataset) / float(2 * num_positive * num_negative)
   else:
-    attr_auc += (num_postive_lower_dataset * num_negative + num_postive * num_negative_upper_dataset) / (2 * num_postive * num_negative)
+    attr_auc += float(num_positive_lower_dataset * num_negative + num_positive * num_negative_upper_dataset) / float(2 * num_positive * num_negative)
 
   return auc - attr_auc
 
@@ -466,6 +466,20 @@ def print_disjunctive(node, dataset, dnf_string):
     return
 
 ##################################################
+# Print tree in disjunctive normal form
+##################################################
+def tree_node_stats(node, feature_list, max_height):
+  if node.is_leaf == True:
+    return
+  if node.height == max_height:
+    return
+  else:
+    feature_list.append(node.attr_split)
+    tree_node_stats(node.upper_child, feature_list, max_height)
+    tree_node_stats(node.lower_child, feature_list, max_height)
+    return
+
+##################################################
 # main function, organize data and execute functions based on input
 # need to account for missing data
 ##################################################
@@ -502,8 +516,8 @@ def main():
       else:
         dataset.class_index = range(len(dataset.attributes))[-1]
         
-    balanced = False
-    preprocess2(dataset, '2', '1', balanced)
+    balanced = True
+    preprocess2(dataset, '2', '1', balanced, 1)
 
     # Split the data set into training and test set
     training_dataset = data(classifier)
@@ -524,38 +538,69 @@ def main():
         test_dataset.class_index = range(len(test_dataset.attributes))[-1]
 
 
-    n_folds = 10
-    cv_arg = KFold(n_folds, shuffle=True)
-    root = None
+    data_samples = []
     if balanced == True:
-      random.shuffle(dataset.balanced_examples)
-      for train_idx, test_idx in cv_arg.split(np.array(dataset.balanced_examples)):
+      data_samples = dataset.balanced_examples
+    else:
+      data.samples = dataset.examples
+
+    random.shuffle(data_samples)
+
+    num_rounds = 10
+    final_accuracy = 0.0
+    final_false_positive_rate = 0.0
+    final_false_negative_rate = 0.0
+    feature_list = []
+    # Start 10 fold cross validation
+    for i in range(num_rounds):
+      n_folds = 10
+      cv_arg = KFold(n_folds, shuffle=True)
+      root = None
+      accuracy = 0.0
+      false_negative_rate = 0.0
+      false_positive_rate = 0.0
+      for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
         results = []
-        training_dataset.examples = [ dataset.balanced_examples[i] for i in train_idx ]
-        test_dataset.examples = [ dataset.balanced_examples[i] for i in test_idx ]
+        training_dataset.examples = [ data_samples[i] for i in train_idx ]
+        test_dataset.examples = [ data_samples[i] for i in test_idx ]
         print "Computing tree..."
         root = compute_tree(training_dataset, None, classifier)
+        tree_node_stats(root, feature_list, 4)
         for example in test_dataset.examples:
           results.append(test_example(example, root))
-        print results
-        ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
-        print ground_truth
-    else:
-      random.shuffle(dataset.examples)
-      for train_idx, test_idx in cv_arg.split(np.array(dataset.examples)):
-        results = []
-        training_dataset.examples = [ dataset.examples[i] for i in train_idx ]
-        test_dataset.examples = [ dataset.examples[i] for i in test_idx ]
-        print "Computing tree..."
-        root = compute_tree(training_dataset, None, classifier) 
-        print_tree(root)
-        for example in test_dataset.examples:
-          results.append(test_example(example, root))
-        print results
-        ground_truth = [example[test_dataset.class_index] for example in test_dataset.examples]
-        print ground_truth
+        ref = [example[test_dataset.class_index] for example in test_dataset.examples]
+        accurate_count = 0
+        false_negative_count = 0
+        false_positive_count = 0
+        preterm_count = 0
+        term_count = 0
+        for i in range(len(results)):
+          if results[i] == ref[i]:
+            accurate_count += 1
+          if ref[i] == 2:
+            preterm_count += 1
+          if ref[i] == 1:
+            term_count += 1
+          # False negative
+          if ref[i] == 2 and results[i] == 1:
+            false_negative_count += 1
+          # False positive
+          if ref[i] == 1 and results[i] == 2:
+            false_positive_count += 1
 
+        accuracy += float(accurate_count) / float(len(results))
+        false_negative_rate += float(false_negative_count) / float(preterm_count)
+        false_positive_rate += float(false_positive_count) / float(term_count)
 
+      final_accuracy += accuracy / n_folds
+      final_false_negative_rate += false_negative_rate / n_folds
+      final_false_positive_rate += false_positive_rate / n_folds
+
+    print "After ", num_rounds, " rounds:"
+    print "Final accuracy: " + str(final_accuracy / num_rounds)
+    print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
+    print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
+    print Counter(feature_list)
 
     #if ("-s" in args):
     #  print_disjunctive(root, dataset, "")
