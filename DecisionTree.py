@@ -12,6 +12,7 @@ import random
 from collections import Counter
 import numpy as np
 from sklearn.model_selection import KFold
+from sklearn import metrics
 
 
 ##################################################
@@ -38,6 +39,7 @@ def read_data(dataset, datafile, datatypes):
 
   #list attributes
   dataset.attributes = dataset.examples.pop(0)
+  print "The number of attributes is: ", len(dataset.attributes)-1
 
   
   ##create array that indicates whether each attribute is a numerical value or not
@@ -103,11 +105,13 @@ def preprocess2(dataset, pos, neg, balanced, multiple_class1=1):
   pos_index_list = []
   neg_index_list = []
   keep_index_list = []
+  offset = random.randint(0, len(dataset.examples))
   if balanced == True:
     count = 0
     for i in range(len(dataset.examples)):
       if (dataset.examples[i][dataset.class_index] == float(positive)):
         pos_index_list.append(i)
+      j = (i + offset) % len(dataset.examples)
       if (dataset.examples[i][dataset.class_index] == float(negative)) and (count < num_positive * multiple_class1):
         neg_index_list.append(i)
         count += 1
@@ -493,6 +497,7 @@ def main():
     print "Your training file (second argument) must be a .csv!"
   else:
     datafile = args[1]
+    num_preterm = int(args[2])
     dataset = data("")
     #if ("-d" in args):
     #  datatypes = args[args.index("-d") + 1]
@@ -516,9 +521,6 @@ def main():
       else:
         dataset.class_index = range(len(dataset.attributes))[-1]
         
-    balanced = True
-    preprocess2(dataset, '2', '1', balanced, 1)
-
     # Split the data set into training and test set
     training_dataset = data(classifier)
     test_dataset = data(classifier)
@@ -537,21 +539,30 @@ def main():
       else:
         test_dataset.class_index = range(len(test_dataset.attributes))[-1]
 
+    balanced = False
+    print "number of preterm label: ", num_preterm
+    preprocess2(dataset, '2', '1', balanced, num_preterm)
 
     data_samples = []
     if balanced == True:
       data_samples = dataset.balanced_examples
     else:
-      data.samples = dataset.examples
+      data_samples = dataset.examples
 
     random.shuffle(data_samples)
+    
+    negative_set = filter(lambda x: x[dataset.class_index] == 1, data_samples)
+    positive_set = filter(lambda x: x[dataset.class_index] == 2, data_samples)
+    print "The number of negative sample is: ", len(negative_set)
+    print "The number of positive sample is: ", len(positive_set)
 
     num_rounds = 10
     final_accuracy = 0.0
     final_false_positive_rate = 0.0
     final_false_negative_rate = 0.0
+    final_true_positive_rate = 0.0
     feature_list = []
-    # Start 10 fold cross validation
+    # Start 10 rounds 10-fold cross validation
     for i in range(num_rounds):
       n_folds = 10
       cv_arg = KFold(n_folds, shuffle=True)
@@ -559,11 +570,11 @@ def main():
       accuracy = 0.0
       false_negative_rate = 0.0
       false_positive_rate = 0.0
+      true_positive_rate = 0.0
       for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
         results = []
         training_dataset.examples = [ data_samples[i] for i in train_idx ]
         test_dataset.examples = [ data_samples[i] for i in test_idx ]
-        print "Computing tree..."
         root = compute_tree(training_dataset, None, classifier)
         tree_node_stats(root, feature_list, 4)
         for example in test_dataset.examples:
@@ -572,6 +583,7 @@ def main():
         accurate_count = 0
         false_negative_count = 0
         false_positive_count = 0
+        true_positive_count = 0
         preterm_count = 0
         term_count = 0
         for i in range(len(results)):
@@ -587,20 +599,27 @@ def main():
           # False positive
           if ref[i] == 1 and results[i] == 2:
             false_positive_count += 1
+          # True positive
+          if ref[i] == 2 and results[i] == 2:
+            true_positive_count += 1
 
         accuracy += float(accurate_count) / float(len(results))
         false_negative_rate += float(false_negative_count) / float(preterm_count)
         false_positive_rate += float(false_positive_count) / float(term_count)
+        true_positive_rate += float(true_positive_count) / float(preterm_count)
 
       final_accuracy += accuracy / n_folds
       final_false_negative_rate += false_negative_rate / n_folds
       final_false_positive_rate += false_positive_rate / n_folds
+      final_true_positive_rate += true_positive_rate / n_folds
 
-    print "After ", num_rounds, " rounds:"
+    print num_preterm, "X data:"
     print "Final accuracy: " + str(final_accuracy / num_rounds)
     print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
     print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
+    
     print Counter(feature_list)
+    print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate / num_rounds, 1.0], [0.0, final_true_positive_rate/num_rounds, 1.0])
 
     #if ("-s" in args):
     #  print_disjunctive(root, dataset, "")
