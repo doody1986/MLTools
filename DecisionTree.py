@@ -13,6 +13,7 @@ from collections import Counter
 import numpy as np
 from sklearn.model_selection import KFold
 from sklearn import metrics
+import pydotplus as pydot
 
 
 ##################################################
@@ -142,6 +143,7 @@ def compute_tree(dataset, parent_node, label_name):
     node.height = node.parent.height + 1
 
   num_pos = pos_count(dataset.examples, dataset.features, label_name)
+  num_neg = len(dataset.examples) - num_pos
   if (len(dataset.examples) == num_pos):
     node.classification = 2
     node.is_leaf = True
@@ -152,6 +154,10 @@ def compute_tree(dataset, parent_node, label_name):
     return node
   else:
     node.is_leaf = False
+    if num_pos > num_neg:
+      node.classification = 2
+    else:
+      node.classification = 1
   feat_to_split = None # The index of the attribute we will split on
   max_gain = 0 # The gain given by the best attribute
   split_val = None 
@@ -451,7 +457,7 @@ def print_disjunctive(node, dataset, dnf_string):
     return
 
 ##################################################
-# Print tree in disjunctive normal form
+# Tree node stats
 ##################################################
 def tree_node_stats(node, feature_list, max_height):
   if node.is_leaf == True:
@@ -465,6 +471,52 @@ def tree_node_stats(node, feature_list, max_height):
     return
 
 ##################################################
+# Visualize tree
+##################################################
+POS_NODE_STYLE = {'shape': 'box',
+                  'fillcolor': '#bd1e24',
+                  'style': 'filled'}
+NEG_NODE_STYLE = {'shape': 'box',
+                  'fillcolor': '#007256',
+                  'style': 'filled'}
+POS_LEAF_STYLE = {'shape': 'ellipse',
+                  'fillcolor': '#bd1e24',
+                  'style': 'filled'}
+NEG_LEAF_STYLE = {'shape': 'ellipse',
+                  'fillcolor': '#007256',
+                  'style': 'filled'}
+
+def visualize_tree(root, max_height):
+  graph = pydot.Dot('DecisionTree', graph_type='digraph')
+  build_tree_graph(graph, root, None, max_height)
+  graph.write_png('selected_decision_tree.png')
+
+node_id = 0
+def build_tree_graph(graph, node, graph_node, max_height):
+  if node.is_leaf == True or node.height == max_height:
+    if node.classification == 2:
+      leaf = pydot.Node("Pre-term", **POS_LEAF_STYLE)
+    elif node.classification == 1:
+      leaf = pydot.Node("Term", **NEG_LEAF_STYLE)
+    graph.add_node(leaf)
+    edge = pydot.Edge(graph_node, leaf)
+    graph.add_edge(edge)
+  else:
+    global node_id
+    node_label = str(node_id)+"\n"+node.feat_split+" >= "+str(node.feat_split_value)
+    node_id += 1
+    if node.classification == 2:
+      local_graph_node = pydot.Node(node_label, **POS_NODE_STYLE)
+    elif node.classification == 1:
+      local_graph_node = pydot.Node(node_label, **NEG_NODE_STYLE)
+    graph.add_node(local_graph_node)
+    if graph_node != None:
+      edge = pydot.Edge(graph_node, local_graph_node)
+      graph.add_edge(edge)
+    build_tree_graph(graph, node.lower_child, local_graph_node, max_height)
+    build_tree_graph(graph, node.upper_child, local_graph_node, max_height)
+
+##################################################
 # main function, organize data and execute functions based on input
 # need to account for missing data
 ##################################################
@@ -474,183 +526,193 @@ def main():
   args = ast.literal_eval(args)
   if (len(args) < 2):
     print "You have input less than the minimum number of arguments. Go back and read README.txt and do it right next time!"
-  elif (args[1][-4:] != ".csv"):
+    exit()
+  if (args[1][-4:] != ".csv"):
     print "Your training file (second argument) must be a .csv!"
+    exit()
+
+  datafile = args[1]
+  num_preterm = int(args[2])
+  dataset = data("")
+  #if ("-d" in args):
+  #  datatypes = args[args.index("-d") + 1]
+  #else:
+  #  datatypes = 'datatypes.csv'
+  # TBD make use of the datatypes
+  datatypes = None
+  read_data(dataset, datafile, datatypes)
+  arg3 = "PPTERM"
+  if (arg3 in dataset.features):
+    label_name = arg3
   else:
-    datafile = args[1]
-    num_preterm = int(args[2])
-    dataset = data("")
-    #if ("-d" in args):
-    #  datatypes = args[args.index("-d") + 1]
-    #else:
-    #  datatypes = 'datatypes.csv'
-    # TBD make use of the datatypes
-    datatypes = None
-    read_data(dataset, datafile, datatypes)
-    arg3 = "PPTERM"
-    if (arg3 in dataset.features):
-      label_name = arg3
+    label_name = dataset.features[-1]
+
+  dataset.label_name = label_name
+
+  #find index of label_name
+  for a in range(len(dataset.features)):
+    if dataset.features[a] == dataset.label_name:
+      dataset.label_index = a
     else:
-      label_name = dataset.features[-1]
-
-    dataset.label_name = label_name
-
-    #find index of label_name
-    for a in range(len(dataset.features)):
-      if dataset.features[a] == dataset.label_name:
-        dataset.label_index = a
-      else:
-        dataset.label_index = range(len(dataset.features))[-1]
-        
-    # Split the data set into training and test set
-    training_dataset = data(label_name)
-    test_dataset = data(label_name)
-    training_dataset.features = dataset.features
-    test_dataset.features = dataset.features
-    #training_dataset.feat_types = dataset.feat_types
-    #test_dataset.feat_types = dataset.feat_types
-    for a in range(len(dataset.features)):
-      if training_dataset.features[a] == training_dataset.label_name:
-        training_dataset.label_index = a
-      else:
-        training_dataset.label_index = range(len(training_dataset.features))[-1]
-    for a in range(len(dataset.features)):
-      if test_dataset.features[a] == test_dataset.label_name:
-        test_dataset.label_index = a
-      else:
-        test_dataset.label_index = range(len(test_dataset.features))[-1]
-
-    balanced = False
-    print "number of preterm label: ", num_preterm
-    preprocess(dataset, '2', '1', balanced, num_preterm)
-
-    data_samples = []
-    if balanced == True:
-      data_samples = dataset.balanced_examples
+      dataset.label_index = range(len(dataset.features))[-1]
+      
+  # Split the data set into training and test set
+  training_dataset = data(label_name)
+  test_dataset = data(label_name)
+  training_dataset.features = dataset.features
+  test_dataset.features = dataset.features
+  #training_dataset.feat_types = dataset.feat_types
+  #test_dataset.feat_types = dataset.feat_types
+  for a in range(len(dataset.features)):
+    if training_dataset.features[a] == training_dataset.label_name:
+      training_dataset.label_index = a
     else:
-      data_samples = dataset.examples
+      training_dataset.label_index = range(len(training_dataset.features))[-1]
+  for a in range(len(dataset.features)):
+    if test_dataset.features[a] == test_dataset.label_name:
+      test_dataset.label_index = a
+    else:
+      test_dataset.label_index = range(len(test_dataset.features))[-1]
 
-    random.shuffle(data_samples)
-    
-    negative_set = filter(lambda x: x[dataset.label_index] == 1, data_samples)
-    positive_set = filter(lambda x: x[dataset.label_index] == 2, data_samples)
-    print "The number of negative sample is: ", len(negative_set)
-    print "The number of positive sample is: ", len(positive_set)
+  balanced = False
+  print "number of preterm label: ", num_preterm
+  preprocess(dataset, '2', '1', balanced, num_preterm)
 
-    num_rounds = 10
-    final_accuracy = 0.0
-    final_false_positive_rate = 0.0
-    final_false_negative_rate = 0.0
-    final_true_positive_rate = 0.0
-    feature_list = []
-    # Start 10 rounds 10-fold cross validation
-    for i in range(num_rounds):
-      n_folds = 10
-      cv_arg = KFold(n_folds, shuffle=True)
-      root = None
-      accuracy = 0.0
-      false_negative_rate = 0.0
-      false_positive_rate = 0.0
-      true_positive_rate = 0.0
-      for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
-        results = []
-        training_dataset.examples = [ data_samples[i] for i in train_idx ]
-        test_dataset.examples = [ data_samples[i] for i in test_idx ]
-        root = compute_tree(training_dataset, None, label_name)
-        tree_node_stats(root, feature_list, 4)
-        for example in test_dataset.examples:
-          results.append(test_example(example, root))
-        ref = [example[test_dataset.label_index] for example in test_dataset.examples]
-        accurate_count = 0
-        false_negative_count = 0
-        false_positive_count = 0
-        true_positive_count = 0
-        preterm_count = 0
-        term_count = 0
-        for i in range(len(results)):
-          if results[i] == ref[i]:
-            accurate_count += 1
-          if ref[i] == 2:
-            preterm_count += 1
-          if ref[i] == 1:
-            term_count += 1
-          # False negative
-          if ref[i] == 2 and results[i] == 1:
-            false_negative_count += 1
-          # False positive
-          if ref[i] == 1 and results[i] == 2:
-            false_positive_count += 1
-          # True positive
-          if ref[i] == 2 and results[i] == 2:
-            true_positive_count += 1
+  data_samples = []
+  if balanced == True:
+    data_samples = dataset.balanced_examples
+  else:
+    data_samples = dataset.examples
 
-        accuracy += float(accurate_count) / float(len(results))
-        false_negative_rate += float(false_negative_count) / float(preterm_count)
-        false_positive_rate += float(false_positive_count) / float(term_count)
-        true_positive_rate += float(true_positive_count) / float(preterm_count)
+  random.shuffle(data_samples)
+  
+  negative_set = filter(lambda x: x[dataset.label_index] == 1, data_samples)
+  positive_set = filter(lambda x: x[dataset.label_index] == 2, data_samples)
+  print "The number of negative sample is: ", len(negative_set)
+  print "The number of positive sample is: ", len(positive_set)
 
-      final_accuracy += accuracy / n_folds
-      final_false_negative_rate += false_negative_rate / n_folds
-      final_false_positive_rate += false_positive_rate / n_folds
-      final_true_positive_rate += true_positive_rate / n_folds
+  num_rounds = 10
+  final_accuracy = 0.0
+  final_false_positive_rate = 0.0
+  final_false_negative_rate = 0.0
+  final_true_positive_rate = 0.0
+  feature_list = []
+  selected_tree = None
+  ref_false_negative_rate = 1.0
+  # Start 10 rounds 10-fold cross validation
+  for i in range(num_rounds):
+    n_folds = 10
+    cv_arg = KFold(n_folds, shuffle=True)
+    root = None
+    accuracy = 0.0
+    false_negative_rate = 0.0
+    false_positive_rate = 0.0
+    true_positive_rate = 0.0
+    for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
+      results = []
+      training_dataset.examples = [ data_samples[i] for i in train_idx ]
+      test_dataset.examples = [ data_samples[i] for i in test_idx ]
+      root = compute_tree(training_dataset, None, label_name)
+      tree_node_stats(root, feature_list, 4)
+      for example in test_dataset.examples:
+        results.append(test_example(example, root))
+      ref = [example[test_dataset.label_index] for example in test_dataset.examples]
+      accurate_count = 0
+      false_negative_count = 0
+      false_positive_count = 0
+      true_positive_count = 0
+      preterm_count = 0
+      term_count = 0
+      for i in range(len(results)):
+        if results[i] == ref[i]:
+          accurate_count += 1
+        if ref[i] == 2:
+          preterm_count += 1
+        if ref[i] == 1:
+          term_count += 1
+        # False negative
+        if ref[i] == 2 and results[i] == 1:
+          false_negative_count += 1
+        # False positive
+        if ref[i] == 1 and results[i] == 2:
+          false_positive_count += 1
+        # True positive
+        if ref[i] == 2 and results[i] == 2:
+          true_positive_count += 1
 
-    print num_preterm, "X data:"
-    print "Final accuracy: " + str(final_accuracy / num_rounds)
-    print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
-    print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
-    
-    print Counter(feature_list)
-    print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate / num_rounds, 1.0], [0.0, final_true_positive_rate/num_rounds, 1.0])
+      accuracy += float(accurate_count) / float(len(results))
+      false_negative_rate += float(false_negative_count) / float(preterm_count)
+      false_positive_rate += float(false_positive_count) / float(term_count)
+      true_positive_rate += float(true_positive_count) / float(preterm_count)
+      if (float(false_negative_count) / float(preterm_count)) < ref_false_negative_rate:
+        selected_tree = root
+        ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
 
-    #if ("-s" in args):
-    #  print_disjunctive(root, dataset, "")
-    #  print "\n"
-    #if ("-v" in args):
-    #  datavalidate = args[args.index("-v") + 1]
-    #  print "Validating tree..."
+    final_accuracy += accuracy / n_folds
+    final_false_negative_rate += false_negative_rate / n_folds
+    final_false_positive_rate += false_positive_rate / n_folds
+    final_true_positive_rate += true_positive_rate / n_folds
 
-    #  validateset = data(label_name)
-    #  read_data(validateset, datavalidate, datatypes)
-    #  for a in range(len(dataset.features)):
-    #    if validateset.features[a] == validateset.label_name:
-    #      validateset.label_index = a
-    #    else:
-    #      validateset.label_index = range(len(validateset.features))[-1]
-    #  preprocess2(validateset)
-    #  best_score = validate_tree(root, validateset)
-    #  all_ex_score = copy.deepcopy(best_score)
-    #  print "Initial (pre-pruning) validation set score: " + str(100*best_score) +"%"
-    #if ("-p" in args):
-    #  if("-v" not in args):
-    #    print "Error: You must validate if you want to prune"
-    #  else:
-    #    post_prune_accuracy = 100*prune_tree(root, root, validateset, best_score)
-    #    print "Post-pruning score on validation set: " + str(post_prune_accuracy) + "%"
-    #if ("-t" in args):
-    #  datatest = args[args.index("-t") + 1]
-    #  testset = data(label_name)
-    #  read_data(testset, datatest, datatypes)
-    #  for a in range(len(dataset.features)):
-    #    if testset.features[a] == testset.label_name:
-    #      testset.label_index = a
-    #    else:
-    #      testset.label_index = range(len(testset.features))[-1]
-    #  print "Testing model on " + str(datatest)
-    #  for example in testset.examples:
-    #    example[testset.label_index] = '0'
-    #  testset.examples[0][testset.label_index] = '1'
-    #  testset.examples[1][testset.label_index] = '1'
-    #  testset.examples[2][testset.label_index] = '?'
-    #  preprocess2(testset)
-    #  b = open('results.csv', 'w')
-    #  a = csv.writer(b)
-    #  for example in testset.examples:
-    #    example[testset.label_index] = test_example(example, root, testset.label_index)
-    #  saveset = testset
-    #  saveset.examples = [saveset.features] + saveset.examples
-    #  a.writerows(saveset.examples)
-    #  b.close()
-    #  print "Testing complete. Results outputted to results.csv"
+  print num_preterm, "X data:"
+  print "Final accuracy: " + str(final_accuracy / num_rounds)
+  print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
+  print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
+  
+  print Counter(feature_list)
+  print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate / num_rounds, 1.0], [0.0, final_true_positive_rate/num_rounds, 1.0])
+
+  max_height = 5
+  visualize_tree(selected_tree, max_height)
+
+  #if ("-s" in args):
+  #  print_disjunctive(root, dataset, "")
+  #  print "\n"
+  #if ("-v" in args):
+  #  datavalidate = args[args.index("-v") + 1]
+  #  print "Validating tree..."
+
+  #  validateset = data(label_name)
+  #  read_data(validateset, datavalidate, datatypes)
+  #  for a in range(len(dataset.features)):
+  #    if validateset.features[a] == validateset.label_name:
+  #      validateset.label_index = a
+  #    else:
+  #      validateset.label_index = range(len(validateset.features))[-1]
+  #  preprocess2(validateset)
+  #  best_score = validate_tree(root, validateset)
+  #  all_ex_score = copy.deepcopy(best_score)
+  #  print "Initial (pre-pruning) validation set score: " + str(100*best_score) +"%"
+  #if ("-p" in args):
+  #  if("-v" not in args):
+  #    print "Error: You must validate if you want to prune"
+  #  else:
+  #    post_prune_accuracy = 100*prune_tree(root, root, validateset, best_score)
+  #    print "Post-pruning score on validation set: " + str(post_prune_accuracy) + "%"
+  #if ("-t" in args):
+  #  datatest = args[args.index("-t") + 1]
+  #  testset = data(label_name)
+  #  read_data(testset, datatest, datatypes)
+  #  for a in range(len(dataset.features)):
+  #    if testset.features[a] == testset.label_name:
+  #      testset.label_index = a
+  #    else:
+  #      testset.label_index = range(len(testset.features))[-1]
+  #  print "Testing model on " + str(datatest)
+  #  for example in testset.examples:
+  #    example[testset.label_index] = '0'
+  #  testset.examples[0][testset.label_index] = '1'
+  #  testset.examples[1][testset.label_index] = '1'
+  #  testset.examples[2][testset.label_index] = '?'
+  #  preprocess2(testset)
+  #  b = open('results.csv', 'w')
+  #  a = csv.writer(b)
+  #  for example in testset.examples:
+  #    example[testset.label_index] = test_example(example, root, testset.label_index)
+  #  saveset = testset
+  #  saveset.examples = [saveset.features] + saveset.examples
+  #  a.writerows(saveset.examples)
+  #  b.close()
+  #  print "Testing complete. Results outputted to results.csv"
       
 if __name__ == "__main__":
   main()
