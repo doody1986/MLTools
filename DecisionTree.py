@@ -184,9 +184,9 @@ def compute_tree(dataset, parent_node, label_name):
       for val in feat_value_list:
         # calculate the gain if we split on this value
         # if gain is greater than local_max_gain, save this gain and this value
-        ## calculate the gain if we split on this value
-        #local_gain = calc_gain(dataset, dataset_entropy, val, feat_index)
-        ## calculate the gain if we split on this value
+        # calculate the gain if we split on this value
+        #local_gain = calc_info_gain(dataset, dataset_entropy, val, feat_index)
+        # calculate the gain if we split on this value
         local_gain = calc_gain_auc(dataset, dataset_auc, val, feat_index)
  
         if (local_gain > local_max_gain):
@@ -248,7 +248,7 @@ def calc_dataset_entropy(dataset, label_name):
   total_examples = len(dataset.examples);
 
   entropy = 0
-  p = num_pos / total_examples
+  p = float(num_pos) / float(total_examples)
   if (p != 0):
     entropy += p * math.log(p, 2)
   p = (total_examples - num_pos)/total_examples
@@ -278,9 +278,8 @@ def calc_info_gain(dataset, entropy, val, feat_index):
   if (len(gain_upper_dataset.examples) == 0 or len(gain_lower_dataset.examples) == 0): #Splitting didn't actually split (we tried to split on the max or min of the attribute's range)
     return -1
 
-  feat_entropy += calc_dataset_entropy(gain_upper_dataset, label_name)*len(gain_upper_dataset.examples)/total_examples
-  feat_entropy += calc_dataset_entropy(gain_lower_dataset, label_name)*len(gain_lower_dataset.examples)/total_examples
-
+  feat_entropy += calc_dataset_entropy(gain_upper_dataset, label_name)*float(len(gain_upper_dataset.examples))/float(total_examples)
+  feat_entropy += calc_dataset_entropy(gain_lower_dataset, label_name)*float(len(gain_lower_dataset.examples))/float(total_examples)
   return entropy - feat_entropy
 
 ##################################################
@@ -495,9 +494,13 @@ node_id = 0
 def build_tree_graph(graph, node, graph_node, max_height):
   if node.is_leaf == True or node.height == max_height:
     if node.classification == 2:
-      leaf = pydot.Node("Pre-term", **POS_LEAF_STYLE)
+      leaf_label = "Pre-term"
+      #leaf_label = "Malignant"
+      leaf = pydot.Node(leaf_label, **POS_LEAF_STYLE)
     elif node.classification == 1:
-      leaf = pydot.Node("Term", **NEG_LEAF_STYLE)
+      leaf_label = "Term"
+      #leaf_label = "Benign"
+      leaf = pydot.Node(leaf_label, **NEG_LEAF_STYLE)
     graph.add_node(leaf)
     edge = pydot.Edge(graph_node, leaf)
     graph.add_edge(edge)
@@ -532,7 +535,6 @@ def main():
     exit()
 
   datafile = args[1]
-  num_preterm = int(args[2])
   dataset = data("")
   #if ("-d" in args):
   #  datatypes = args[args.index("-d") + 1]
@@ -541,7 +543,9 @@ def main():
   # TBD make use of the datatypes
   datatypes = None
   read_data(dataset, datafile, datatypes)
-  arg3 = "PPTERM"
+  #arg3 = "PPTERM"
+  #arg3 = "Class"
+  arg3 = args[2]
   if (arg3 in dataset.features):
     label_name = arg3
   else:
@@ -575,8 +579,11 @@ def main():
       test_dataset.label_index = range(len(test_dataset.features))[-1]
 
   balanced = False
-  print "number of preterm label: ", num_preterm
-  preprocess(dataset, '2', '1', balanced, num_preterm)
+  if balanced == True:
+    num_preterm = int(args[3])
+    print "number of preterm label: ", num_preterm
+    preprocess(dataset, '2', '1', balanced, num_preterm)
+  preprocess(dataset, '2', '1', balanced)
 
   data_samples = []
   if balanced == True:
@@ -639,7 +646,8 @@ def main():
         # True positive
         if ref[i] == 2 and results[i] == 2:
           true_positive_count += 1
-
+      if preterm_count == 0:
+        continue
       accuracy += float(accurate_count) / float(len(results))
       false_negative_rate += float(false_negative_count) / float(preterm_count)
       false_positive_rate += float(false_positive_count) / float(term_count)
@@ -653,7 +661,6 @@ def main():
     final_false_positive_rate += false_positive_rate / n_folds
     final_true_positive_rate += true_positive_rate / n_folds
 
-  print num_preterm, "X data:"
   print "Final accuracy: " + str(final_accuracy / num_rounds)
   print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
   print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
