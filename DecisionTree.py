@@ -482,13 +482,9 @@ def tree_node_stats(node, feature_list, max_height):
 # Visualize tree
 ##################################################
 POS_NODE_STYLE = {'shape': 'box',
-                  'fillcolor': 'blue',
-                  'style': 'filled',
-                  'fontcolor': 'white'}
+                  'style': 'filled'}
 NEG_NODE_STYLE = {'shape': 'box',
-                  'fillcolor': 'blue',
-                  'style': 'filled',
-                  'fontcolor': 'white'}
+                  'style': 'filled'}
 POS_LEAF_STYLE = {'shape': 'ellipse',
                   'fillcolor': '#bd1e24',
                   'style': 'filled',
