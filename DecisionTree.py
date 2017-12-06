@@ -75,7 +75,7 @@ def preprocess(dataset, pos, neg, balanced, multiple_pos=1):
     major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
     if major_feat_value_pos == '?' or major_feat_value_pos == '':
       major_feat_value_pos = feat_values_counts_pos.most_common(2)[1][0]
-    
+
     for example in dataset.examples:
       if (example[feat_index] == '?' or example[feat_index] == ''):
         if (example[dataset.label_index] == negative):
@@ -592,7 +592,7 @@ def main():
   if balanced == True:
     num_preterm = int(args[3])
     print "number of preterm label: ", num_preterm
-    preprocess(dataset, '2', '1', balanced, num_preterm)
+    preprocess(dataset, 2, 1, balanced, num_preterm)
   preprocess(dataset, '2', '1', balanced)
 
   data_samples = []
@@ -626,6 +626,7 @@ def main():
     false_negative_rate = 0.0
     false_positive_rate = 0.0
     true_positive_rate = 0.0
+    local_round = 0
     for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
       results = []
       training_dataset.examples = [ data_samples[i] for i in train_idx ]
@@ -659,6 +660,7 @@ def main():
           true_positive_count += 1
       if preterm_count == 0:
         continue
+      local_round += 1
       accuracy += float(accurate_count) / float(len(results))
       false_negative_rate += float(false_negative_count) / float(preterm_count)
       false_positive_rate += float(false_positive_count) / float(term_count)
@@ -667,10 +669,10 @@ def main():
         selected_tree = root
         ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
 
-    final_accuracy += accuracy / n_folds
-    final_false_negative_rate += false_negative_rate / n_folds
-    final_false_positive_rate += false_positive_rate / n_folds
-    final_true_positive_rate += true_positive_rate / n_folds
+    final_accuracy += accuracy / local_round
+    final_false_negative_rate += false_negative_rate / local_round
+    final_false_positive_rate += false_positive_rate / local_round
+    final_true_positive_rate += true_positive_rate / local_round
 
   print "Final accuracy: " + str(final_accuracy / num_rounds)
   print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
