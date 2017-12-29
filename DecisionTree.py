@@ -124,6 +124,7 @@ class treeNode():
     self.height = None
     self.num_pos = 0
     self.num_neg = 0
+    self.metric = 0
 
 ##################################################
 # compute tree recursively
@@ -172,9 +173,11 @@ def compute_tree(dataset, parent_node, label_name):
   min_gain = 0.01
   dataset_entropy = calc_dataset_entropy(dataset, label_name)
   dataset_auc = 0.5
+  max_auc = 0
   for feat_index in range(len(dataset.features)):
     if (dataset.features[feat_index] != label_name):
       local_max_gain = 0
+      local_max_auc = 0
       local_split_val = None
       # these are the values we can split on, now we must find the best one
       feat_value_list = [example[feat_index] for example in dataset.examples]
@@ -195,14 +198,19 @@ def compute_tree(dataset, parent_node, label_name):
         # calculate the gain if we split on this value
         #local_gain = calc_info_gain(dataset, dataset_entropy, val, feat_index)
         # calculate the gain if we split on this value
-        local_gain = calc_gain_auc(dataset, dataset_auc, val, feat_index)
+        results_tuple = calc_gain_auc(dataset, dataset_auc, val, feat_index)
+        local_gain = results_tuple[0]
+        local_auc = results_tuple[1]
+        #print dataset.features[feat_index], " ", val, " ", local_auc
  
         if (local_gain > local_max_gain):
           local_max_gain = local_gain
           local_split_val = val
+          local_max_auc = local_auc
 
       if (local_max_gain > max_gain):
         max_gain = local_max_gain
+        max_auc = local_max_auc
         split_val = local_split_val
         feat_to_split = feat_index
 
@@ -216,9 +224,11 @@ def compute_tree(dataset, parent_node, label_name):
 
     return node
 
+  #exit()
   node.feat_split_index = feat_to_split
   node.feat_split = dataset.features[feat_to_split]
   node.feat_split_value = split_val
+  node.metric = max_auc
 
   # currently doing one split per node so only two datasets are created
   upper_dataset = data(label_name)
@@ -307,10 +317,9 @@ def calc_gain_auc(dataset, auc, val, feat_index):
       gain_upper_dataset.examples.append(example)
     elif (example[feat_index] < val):
       gain_lower_dataset.examples.append(example)
-
   #Splitting didn't actually split (we tried to split on the max or min of the attribute's range)
   if (len(gain_upper_dataset.examples) == 0 or len(gain_lower_dataset.examples) == 0):
-    return -1
+    return (-1, -1)
 
   num_total = len(dataset.examples);
   num_positive = pos_count(dataset.examples, dataset.features, label_name)
@@ -329,7 +338,13 @@ def calc_gain_auc(dataset, auc, val, feat_index):
   else:
     feat_auc = float(num_positive_lower_dataset * num_negative + num_positive * num_negative_upper_dataset) / float(2 * num_positive * num_negative)
 
-  return feat_auc - auc
+  #if dataset.features[feat_index] == "PESTIAPPAFREQ":
+  #  print "Number of positive in upper", num_positive_upper_dataset
+  #  print "Number of negative in upper", num_negative_upper_dataset
+  #  print "Number of positive in lower", num_positive_lower_dataset
+  #  print "Number of negative in lower", num_negative_lower_dataset
+  #  exit()
+  return (feat_auc - auc, feat_auc)
 
 ##################################################
 # count number of examples with classification "1"
@@ -518,7 +533,8 @@ def build_tree_graph(graph, node, graph_node, edge_label, max_height):
   else:
     global node_id
     node_label = node.feat_split+" >= "+str(node.feat_split_value)+"\n"+\
-                 "NumPos "+str(node.num_pos)+" NumNeg "+str(node.num_neg)
+                 "NumPos "+str(node.num_pos)+" NumNeg "+str(node.num_neg)+"\n"+\
+                 "AUC "+str(round(node.metric, 2))
     node_id += 1
     if node.classification == 2:
       local_graph_node = pydot.Node(node_id, label=node_label, **POS_NODE_STYLE)

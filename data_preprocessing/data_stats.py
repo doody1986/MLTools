@@ -15,9 +15,30 @@ def main():
   study_id_list = []
   df_dict = collections.OrderedDict()
   for file_name in arg_list:
+    features = []
     df_dict[file_name] = pd.read_csv(file_name)
-    feature_list += list(df_dict[file_name].columns.values)
+    features = list(df_dict[file_name].columns.values)
+    feature_list += features
     study_id_list += list(df_dict[file_name]["STUDY_ID"])
+
+    # Missing data handling
+    pos_index = df_dict[file_name].index[df_dict[file_name]['PPTERM'] == 2].tolist()
+    neg_index = df_dict[file_name].index[df_dict[file_name]['PPTERM'] == 1].tolist()
+    for feat in features:
+      null_flags = list(df_dict[file_name][feat].isnull())
+      if any(null_flags):
+        pos_samples = list(df_dict[file_name][feat][pos_index])
+        neg_samples = list(df_dict[file_name][feat][neg_index])
+        feat_values_counts_pos = collections.Counter(pos_samples)
+        major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
+        feat_values_counts_neg = collections.Counter(neg_samples)
+        major_feat_value_neg = feat_values_counts_neg.most_common(1)[0][0]
+        for i in pos_index:
+          if np.isnan(df_dict[file_name][feat][i]):
+            df_dict[file_name].at[i, feat] = major_feat_value_pos
+        for i in neg_index:
+          if np.isnan(df_dict[file_name][feat][i]):
+            df_dict[file_name].at[i, feat] = major_feat_value_neg
 
   # Compute the statistics of features and study_id
   num_file = len(arg_list)
@@ -45,8 +66,8 @@ def main():
   # Re-generate combined data
   keys = df_dict.keys()
   header = []
-  f_id = open("test.csv", "wb")
-  file_writer = csv.writer(f_id)
+  fd = open("combined.csv", "wb")
+  file_writer = csv.writer(fd)
   for key in keys:
     for feature in overlapped_features:
       if feature != "STUDY_ID" and feature != "PPTERM":
@@ -61,6 +82,8 @@ def main():
         remove_idx += df_dict[key].index[df_dict[key]['STUDY_ID'] == study_id].tolist()
     for index in sorted(remove_idx, reverse=True):
       df_dict[key] = df_dict[key].drop(df_dict[key].index[index])
+    #df_dict[key].to_csv("unique_"+key)
+    #continue
 
     if key == keys[-1]:
       temp = list(df_dict[key].columns.values)
