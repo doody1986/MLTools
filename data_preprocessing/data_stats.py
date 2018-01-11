@@ -16,6 +16,9 @@ def main():
   study_id_list = []
   df_dict = collections.OrderedDict()
 
+  field_indicator = open("field.csv", "rb")
+  file_reader = csv.reader(field_indicator)
+
   no_ambiguous_data = True
   # Get the dataframe
   for file_name in arg_list:
@@ -60,6 +63,10 @@ def main():
     #      if np.isnan(df_dict[file_name][feat][i]):
     #        #df_dict[file_name].at[i, feat] = major_feat_value
     #        df_dict[file_name].at[i, feat] = 555
+    fields_index_list = []
+    for field in file_reader:
+      if field[0] in features:
+        fields_index_list.append(features.index(field[0]))
 
     # Missing data handling using similarity
     num_sample = len(indices)
@@ -77,14 +84,18 @@ def main():
         similarity = 0
         count = 0
         data_j = list(df_dict[file_name].loc[int(indices[j])])
-        for f in range(num_feature):
+        for f in fields_index_list:
           if np.isnan(data_i[f]) or np.isnan(data_j[f]):
             continue
           else:
             similarity -= (float(data_i[f]) - float(data_j[f])) * (float(data_i[f]) - float(data_j[f]))
             count += 1
-        similarity_mat[i][j] = similarity# / float(count)
-        similarity_mat[j][i] = similarity# / float(count)
+        if count < 10:
+          similarity_mat[i][j] = -999999
+          similarity_mat[j][i] = -999999
+        else:
+          similarity_mat[i][j] = similarity / float(count)
+          similarity_mat[j][i] = similarity / float(count)
     print "Similarity matrix construction done"
 
     # Missing data handling
@@ -101,11 +112,10 @@ def main():
             if np.isnan(data_x[f]):
               continue
             else:
-              df_dict[file_name].at[features[f], i] = data_x[f]
-              print "Feature:", f
-              print "Selected Similarity:", sorted_similarity_sample[sorted_index[num]]
+              #df_dict[file_name].at[features[f], i] = data_x[f]
+              df_dict[file_name][features[f]][i] = data_x[f]
               break
-          if np.isnan(data_i[f]):
+          if np.isnan(df_dict[file_name][features[f]][i]):
             print "Number of try is not enough"
             exit()
 
