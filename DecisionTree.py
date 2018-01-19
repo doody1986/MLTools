@@ -60,31 +60,30 @@ def preprocess(dataset, pos, neg, balanced, multiple_pos=1):
 
   for feat_index in range(len(dataset.features)):
 
-    neg_samples = filter(lambda x: x[dataset.label_index] == negative, dataset.examples)
-    feat_values_neg_samples = [example[feat_index] for example in neg_samples]
-             
-    pos_samples = filter(lambda x: x[dataset.label_index] == positive, dataset.examples)
-    feat_values_pos_samples = [example[feat_index] for example in pos_samples]
-        
-    feat_values_counts_neg = Counter(feat_values_neg_samples)
-    major_feat_value_neg = feat_values_counts_neg.most_common(1)[0][0]
-    if major_feat_value_neg == '?' or major_feat_value_neg == '':
-      major_feat_value_neg = feat_values_counts_neg.most_common(2)[1][0]
+    #neg_samples = filter(lambda x: x[dataset.label_index] == negative, dataset.examples)
+    #feat_values_neg_samples = [example[feat_index] for example in neg_samples]
+    #         
+    #pos_samples = filter(lambda x: x[dataset.label_index] == positive, dataset.examples)
+    #feat_values_pos_samples = [example[feat_index] for example in pos_samples]
+    #    
+    #feat_values_counts_neg = Counter(feat_values_neg_samples)
+    #major_feat_value_neg = feat_values_counts_neg.most_common(1)[0][0]
+    #if major_feat_value_neg == '?' or major_feat_value_neg == '':
+    #  major_feat_value_neg = feat_values_counts_neg.most_common(2)[1][0]
 
-    feat_values_counts_pos = Counter(feat_values_pos_samples)
-    major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
-    if major_feat_value_pos == '?' or major_feat_value_pos == '':
-      major_feat_value_pos = feat_values_counts_pos.most_common(2)[1][0]
+    #feat_values_counts_pos = Counter(feat_values_pos_samples)
+    #major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
+    #if major_feat_value_pos == '?' or major_feat_value_pos == '':
+    #  major_feat_value_pos = feat_values_counts_pos.most_common(2)[1][0]
+
+    feat_values = [example[feat_index] for example in dataset.examples]
+
+    feat_values_counts = Counter(feat_values)
+    major_feat_value = feat_values_counts.most_common(1)[0][0]
 
     for example in dataset.examples:
       if (example[feat_index] == '?' or example[feat_index] == ''):
-        if (example[dataset.label_index] == negative):
-          example[feat_index] = major_feat_value_neg
-        elif (example[dataset.label_index] == positive):
-          example[feat_index] = major_feat_value_pos
-        else:
-          print "No label for this example"
-          exit()
+        example[feat_index] = major_feat_value
 
     #convert features that are numeric to floats
     for example in dataset.examples:
@@ -201,7 +200,10 @@ def compute_tree(dataset, parent_node, label_name):
         results_tuple = calc_gain_auc(dataset, dataset_auc, val, feat_index)
         local_gain = results_tuple[0]
         local_auc = results_tuple[1]
-        #print dataset.features[feat_index], " ", val, " ", local_auc
+        #if dataset.features[feat_index] == "PESTSTOREV2":
+        #  print dataset.features[feat_index], " ", val, " ", local_auc
+        #if dataset.features[feat_index] == "PESTIAPPAFREQ":
+        #  print dataset.features[feat_index], " ", val, " ", local_auc
  
         if (local_gain > local_max_gain):
           local_max_gain = local_gain
@@ -624,7 +626,7 @@ def main():
   print "The number of negative sample is: ", len(negative_set)
   print "The number of positive sample is: ", len(positive_set)
 
-  num_rounds = 10
+  num_rounds = 1
   final_accuracy = 0.0
   final_false_positive_rate = 0.0
   final_false_negative_rate = 0.0
