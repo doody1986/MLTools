@@ -56,6 +56,7 @@ def Filter(raw_data_file):
   global numerical_fields
   categorical_fields = []
   checkbox_fields = []
+  numerical_fields = []
   for column in data.columns:
     if column == "STUDY_ID":
       continue
@@ -140,7 +141,58 @@ def NormalizeNumericalData(data):
     new_data[column] = (new_data[column] - mean_) / var_
     max_ = new_data[column].max()
     new_data[column] = new_data[column] / max_
+  if "STUDY_ID" in list(new_data.columns):
+    new_data.drop("STUDY_ID", axis=1, inplace=True)
+  if "PPTERM" in list(new_data.columns):
+    new_data.drop("PPTERM", axis=1, inplace=True)
   return new_data
+
+def MissingDataHandling(data):
+  # Calculate similarity matrix
+  features = data.columns.tolist()
+  indices = data.index.tolist()
+  normalized_data = NormalizeNumericalData(data)
+
+  num_feature = len(features)
+  num_sample = len(indices)
+
+  # Initialize the similarity matrix
+  similarity_mat = []
+  for i in range(num_sample):
+    similarity_mat.append([-999999]*num_sample)
+
+  # Do the calculation
+  for i in range(num_sample):
+    for j in range(i+1, num_sample):
+      similarity = 0
+      data_i = normalized_data.values[i]
+      data_j = normalized_data.values[j]
+      product = data_i * data_j
+      count = np.count_nonzero(~np.isnan(product))
+      similarity = np.nansum(product) / float(count)
+      similarity_mat[i][j] = similarity
+      similarity_mat[j][i] = similarity
+  print "Similarity matrix construction done"
+
+  # Missing data handling
+  num_try = 100
+  for i in range(num_sample):
+    for f in numerical_fields:
+      if np.isnan(data[f][indices[i]]):
+        similarity_sample = similarity_mat[i]
+        sorted_similarity_sample = sorted(similarity_sample, reverse=True)
+        sorted_index = [idx[0] for idx in sorted(zip(indices, similarity_sample), key=lambda x:x[1], reverse=True)]
+        for num in range(num_try):
+          if np.isnan(data[f][sorted_index[num]]):
+            continue
+          else:
+            print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
+            data.loc[indices[i], f] = data[f][sorted_index[num]]
+            break
+        if np.isnan(data[f][indices[i]]):
+          print "Number of try is not enough"
+          exit() 
+  return data
 
 def Merge(data_list, file_list):
   feature_list = []
@@ -213,53 +265,6 @@ def Merge(data_list, file_list):
   # Remove the STUDY_ID column
   data.drop("STUDY_ID", axis=1, inplace=True)
 
-  return data
-
-def MissingDataHandling(data):
-  # Calculate similarity matrix
-  features = data.columns.tolist()
-  samples = data.index.tolist()
-  normalized_data = NormalizeNumericalData(data)
-
-  num_feature = len(features)
-  num_sample = len(samples)
-
-  # Initialize the similarity matrix
-  similarity_mat = []
-  for i in range(num_sample):
-    similarity_mat.append([-999999]*num_sample)
-
-  # Do the calculation
-  for i in range(num_sample):
-    for j in range(i+1, num_sample):
-      similarity = 0
-      data_i = normalized_data.values[i]
-      data_j = normalized_data.values[j]
-      product = data_i * data_j
-      count = np.count_nonzero(~np.isnan(product))
-      similarity = np.nansum(product) / float(count)
-      similarity_mat[i][j] = similarity
-      similarity_mat[j][i] = similarity
-  print "Similarity matrix construction done"
-
-  # Missing data handling
-  num_try = 100
-  for i in range(num_sample):
-    for f in numerical_fields:
-      if np.isnan(data[f][i]):
-        similarity_sample = similarity_mat[i]
-        sorted_similarity_sample = sorted(similarity_sample, reverse=True)
-        sorted_index = [index[0] for index in sorted(enumerate(similarity_sample), key=lambda x:x[1], reverse=True)]
-        for num in range(num_try):
-          if np.isnan(data[f][sorted_index[num]]):
-            continue
-          else:
-            data.loc[i, f] = data[f][sorted_index[num]]
-            print "Selected Similarity:", sorted_similarity_sample[sorted_index[num]]
-            break
-        if np.isnan(data[f][i]):
-          print "Number of try is not enough"
-          exit() 
   return data
 
 def main():
