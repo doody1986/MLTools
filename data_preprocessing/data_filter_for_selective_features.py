@@ -44,9 +44,10 @@ def Extract(dd_file):
 categorical_fields = []
 checkbox_fields = []
 numerical_fields = []
+selective_fields_keyword = "PEST"
 def Filter(raw_data_file):
   data = pd.read_csv(raw_data_file)
-  no_ambiguous_data = True
+  no_ambiguous_data = False
   if no_ambiguous_data:
     data.replace(888, np.nan, inplace=True, regex=True)
     data.replace(999, np.nan, inplace=True, regex=True)
@@ -56,7 +57,6 @@ def Filter(raw_data_file):
   global numerical_fields
   categorical_fields = []
   checkbox_fields = []
-  numerical_fields = []
   for column in data.columns:
     if column == "STUDY_ID":
       continue
@@ -64,7 +64,7 @@ def Filter(raw_data_file):
       continue
 
     # Remove unchosen fields
-    if column not in global_mixed_fields:
+    if (column not in global_mixed_fields) or (selective_fields_keyword not in column):
       data.drop(column, axis=1, inplace=True)
       continue
 
@@ -72,7 +72,7 @@ def Filter(raw_data_file):
     remove = True
     valid_fields_count = collections.Counter(null_flags)[False]
     valid_proportion_by_sample = float(valid_fields_count) / float(len(null_flags))
-    if valid_proportion_by_sample > 0.8:
+    if valid_proportion_by_sample > 0.5:
       remove = False
 
     if remove == True:
@@ -102,99 +102,13 @@ def Filter(raw_data_file):
         null_count += 1
 
     null_proportion_by_features = float(null_count) / num_features
-    if null_proportion_by_features > 0.2:
+    if null_proportion_by_features > 0.5:
       remove_idx.append(i)
   remove_idx.sort(reverse=True)
   for i in remove_idx:
     data = data.drop(data.index[i])
   print "The row number of raw data AFTER filtered is: " + str(len(data.index))
 
-  #data.to_csv("filtered_" + raw_data_file[:-4] + "_" + time.strftime("%m%d%Y") + ".csv")
-  return data
-
-def OneHotEncoding(data):
-  # One-hot encoding categorical data
-  data = pd.get_dummies(data, prefix=categorical_fields, prefix_sep='__', dummy_na=True, columns=categorical_fields)
-
-  # Deal with alread one-hot encoded data
-  list_888 = []
-  list_999 = []
-  for column in checkbox_fields:
-    if "888" in column:
-      list_888.append(column)
-    if "999" in column:
-      list_999.append(column)
-  if len(list_888) != len(list_999):
-    print "Do not make sense!!"
-    exit()
-  for i in range(len(list_888)):
-    data[list_999[i]] = data[list_999[i]] | data[list_888[i]]
-    data.drop(list_888[i], axis=1, inplace=True)
-  
-  return data
-
-def NormalizeNumericalData(data):
-  new_data = data.copy()
-  if "STUDY_ID" in list(new_data.columns):
-    new_data.drop("STUDY_ID", axis=1, inplace=True)
-  if "PPTERM" in list(new_data.columns):
-    new_data.drop("PPTERM", axis=1, inplace=True)
-  for column in numerical_fields:
-    mean_ = new_data[column].mean()
-    var_ = new_data[column].var()
-    new_data[column] = (new_data[column] - mean_) / var_
-    min_ = new_data[column].min()
-    if min_ < 0:
-      new_data[column] = new_data[column] - min_
-    max_ = new_data[column].max()
-    new_data[column] = new_data[column] / max_
-  return new_data
-
-def MissingDataHandling(data):
-  # Calculate similarity matrix
-  features = data.columns.tolist()
-  indices = data.index.tolist()
-  normalized_data = NormalizeNumericalData(data)
-
-  num_feature = len(features)
-  num_sample = len(indices)
-
-  # Initialize the similarity matrix
-  similarity_mat = []
-  for i in range(num_sample):
-    similarity_mat.append([-999999]*num_sample)
-
-  # Do the calculation
-  for i in range(num_sample):
-    for j in range(i+1, num_sample):
-      similarity = 0
-      data_i = normalized_data.values[i]
-      data_j = normalized_data.values[j]
-      product = data_i * data_j
-      count = np.count_nonzero(~np.isnan(product))
-      similarity = np.nansum(product) / float(count)
-      similarity_mat[i][j] = similarity
-      similarity_mat[j][i] = similarity
-  print "Similarity matrix construction done"
-
-  # Missing data handling
-  num_try = 100
-  for i in range(num_sample):
-    for f in numerical_fields:
-      if np.isnan(data[f][indices[i]]):
-        similarity_sample = similarity_mat[i]
-        sorted_similarity_sample = sorted(similarity_sample, reverse=True)
-        sorted_index = [idx[0] for idx in sorted(zip(indices, similarity_sample), key=lambda x:x[1], reverse=True)]
-        for num in range(num_try):
-          if np.isnan(data[f][sorted_index[num]]):
-            continue
-          else:
-            print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
-            data.loc[indices[i], f] = data[f][sorted_index[num]]
-            break
-        if np.isnan(data[f][indices[i]]):
-          print "Number of try is not enough"
-          exit() 
   return data
 
 def Merge(data_list, file_list):
@@ -264,11 +178,9 @@ def Merge(data_list, file_list):
   data = data_list[v1_key].merge(data_list[v2_key], on='STUDY_ID')
 
   # Remove the STUDY_ID column
-  data.drop("STUDY_ID", axis=1, inplace=True)
+  #data.drop("STUDY_ID", axis=1, inplace=True)
 
   return data
-
-
 
 def main():
   print ("Start program.")
@@ -293,25 +205,13 @@ def main():
     data = Filter(file_name)
     print file_name, "filter done"
 
-    # One hot encoding for the categorical data
-    data = OneHotEncoding(data)
-    print file_name, "one hot encoding done"
-
-    # Reorder the dataframe
-    features = data.columns.tolist()
-    features.remove("PPTERM")
-    data = data[features+["PPTERM"]]
-
-    data = MissingDataHandling(data)
-    print "Missing done handling done"
-
     # Add the data into the data list
     data_list[file_name] = data
 
   data = Merge(data_list, arg_list)
   print "Merge done"
 
-  data.to_csv("combined_v1_v2.csv", index=False)
+  data.to_csv("combined_data_selected_fields.csv", index=False)
   print ("End program.")
   return 0
 

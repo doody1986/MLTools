@@ -56,7 +56,6 @@ def Filter(raw_data_file):
   global numerical_fields
   categorical_fields = []
   checkbox_fields = []
-  numerical_fields = []
   for column in data.columns:
     if column == "STUDY_ID":
       continue
@@ -152,9 +151,10 @@ def NormalizeNumericalData(data):
 
 def MissingDataHandling(data):
   # Calculate similarity matrix
+  onehot_data = OneHotEncoding(data.copy())
   features = data.columns.tolist()
   indices = data.index.tolist()
-  normalized_data = NormalizeNumericalData(data)
+  normalized_data = NormalizeNumericalData(onehot_data)
 
   num_feature = len(features)
   num_sample = len(indices)
@@ -268,8 +268,6 @@ def Merge(data_list, file_list):
 
   return data
 
-
-
 def main():
   print ("Start program.")
 
@@ -294,22 +292,22 @@ def main():
     print file_name, "filter done"
 
     # One hot encoding for the categorical data
-    data = OneHotEncoding(data)
-    print file_name, "one hot encoding done"
+    #data = OneHotEncoding(data)
+    #print file_name, "one hot encoding done"
 
-    # Reorder the dataframe
-    features = data.columns.tolist()
-    features.remove("PPTERM")
-    data = data[features+["PPTERM"]]
-
-    data = MissingDataHandling(data)
-    print "Missing done handling done"
+    ## Reorder the dataframe
+    #features = data.columns.tolist()
+    #features.remove("PPTERM")
+    #data = data[features+["PPTERM"]]
 
     # Add the data into the data list
     data_list[file_name] = data
 
   data = Merge(data_list, arg_list)
   print "Merge done"
+
+  data = MissingDataHandling(data)
+  print "Missing done handling done"
 
   data.to_csv("combined_v1_v2.csv", index=False)
   print ("End program.")

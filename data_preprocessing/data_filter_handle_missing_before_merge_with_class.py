@@ -72,7 +72,7 @@ def Filter(raw_data_file):
     remove = True
     valid_fields_count = collections.Counter(null_flags)[False]
     valid_proportion_by_sample = float(valid_fields_count) / float(len(null_flags))
-    if valid_proportion_by_sample > 0.8:
+    if valid_proportion_by_sample > 0.5:
       remove = False
 
     if remove == True:
@@ -102,7 +102,7 @@ def Filter(raw_data_file):
         null_count += 1
 
     null_proportion_by_features = float(null_count) / num_features
-    if null_proportion_by_features > 0.2:
+    if null_proportion_by_features > 0.5:
       remove_idx.append(i)
   remove_idx.sort(reverse=True)
   for i in remove_idx:
@@ -151,50 +151,60 @@ def NormalizeNumericalData(data):
   return new_data
 
 def MissingDataHandling(data):
-  # Calculate similarity matrix
+  onehot_data = OneHotEncoding(data.copy())
+  data_pos_neg = []
   features = data.columns.tolist()
-  indices = data.index.tolist()
-  normalized_data = NormalizeNumericalData(data)
+  pos_indices = onehot_data.index[onehot_data['PPTERM'] == 2].tolist()
+  neg_indices = onehot_data.index[onehot_data['PPTERM'] == 1].tolist()
+  data_pos_neg.append(onehot_data.loc[pos_indices])
+  data_pos_neg.append(onehot_data.loc[neg_indices])
+  for df in data_pos_neg:
+    # Calculate similarity matrix
 
-  num_feature = len(features)
-  num_sample = len(indices)
+    normalized_data = NormalizeNumericalData(df)
+    indices = normalized_data.index.tolist()
+    num_sample = len(indices)
 
-  # Initialize the similarity matrix
-  similarity_mat = []
-  for i in range(num_sample):
-    similarity_mat.append([-999999]*num_sample)
+    # Initialize the similarity matrix
+    similarity_mat = []
+    for i in range(num_sample):
+      similarity_mat.append([-999999]*num_sample)
 
-  # Do the calculation
-  for i in range(num_sample):
-    for j in range(i+1, num_sample):
-      similarity = 0
-      data_i = normalized_data.values[i]
-      data_j = normalized_data.values[j]
-      product = data_i * data_j
-      count = np.count_nonzero(~np.isnan(product))
-      similarity = np.nansum(product) / float(count)
-      similarity_mat[i][j] = similarity
-      similarity_mat[j][i] = similarity
-  print "Similarity matrix construction done"
+    # Do the calculation
+    for i in range(num_sample):
+      for j in range(i+1, num_sample):
+        similarity = 0
+        data_i = normalized_data.values[i]
+        data_j = normalized_data.values[j]
+        product = data_i * data_j
+        count = np.count_nonzero(~np.isnan(product))
+        similarity = np.nansum(product) / float(count)
+        if similarity > 1:
+          print data_i
+          print data_j
+          exit()
+        similarity_mat[i][j] = similarity
+        similarity_mat[j][i] = similarity
+    print "Similarity matrix construction done"
 
-  # Missing data handling
-  num_try = 100
-  for i in range(num_sample):
-    for f in numerical_fields:
-      if np.isnan(data[f][indices[i]]):
-        similarity_sample = similarity_mat[i]
-        sorted_similarity_sample = sorted(similarity_sample, reverse=True)
-        sorted_index = [idx[0] for idx in sorted(zip(indices, similarity_sample), key=lambda x:x[1], reverse=True)]
-        for num in range(num_try):
-          if np.isnan(data[f][sorted_index[num]]):
-            continue
-          else:
-            print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
-            data.loc[indices[i], f] = data[f][sorted_index[num]]
-            break
+    # Missing data handling
+    num_try = 100
+    for i in range(num_sample):
+      for f in features:
         if np.isnan(data[f][indices[i]]):
-          print "Number of try is not enough"
-          exit() 
+          similarity_sample = similarity_mat[i]
+          sorted_similarity_sample = sorted(similarity_sample, reverse=True)
+          sorted_index = [idx[0] for idx in sorted(zip(indices, similarity_sample), key=lambda x:x[1], reverse=True)]
+          for num in range(num_try):
+            if np.isnan(data[f][sorted_index[num]]):
+              continue
+            else:
+              print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
+              data.loc[indices[i], f] = data[f][sorted_index[num]]
+              break
+          if np.isnan(data[f][indices[i]]):
+            print "Number of try is not enough"
+            exit() 
   return data
 
 def Merge(data_list, file_list):
@@ -294,13 +304,11 @@ def main():
     print file_name, "filter done"
 
     # One hot encoding for the categorical data
-    data = OneHotEncoding(data)
-    print file_name, "one hot encoding done"
-
-    # Reorder the dataframe
-    features = data.columns.tolist()
-    features.remove("PPTERM")
-    data = data[features+["PPTERM"]]
+    #data = OneHotEncoding(data)
+    #features = data.columns.tolist()
+    #features.remove("PPTERM")
+    #data = data[features+["PPTERM"]]
+    #print file_name, "one hot encoding done"
 
     data = MissingDataHandling(data)
     print "Missing done handling done"

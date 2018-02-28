@@ -72,7 +72,7 @@ def Filter(raw_data_file):
     remove = True
     valid_fields_count = collections.Counter(null_flags)[False]
     valid_proportion_by_sample = float(valid_fields_count) / float(len(null_flags))
-    if valid_proportion_by_sample > 0.8:
+    if valid_proportion_by_sample > 0.5:
       remove = False
 
     if remove == True:
@@ -102,7 +102,7 @@ def Filter(raw_data_file):
         null_count += 1
 
     null_proportion_by_features = float(null_count) / num_features
-    if null_proportion_by_features > 0.2:
+    if null_proportion_by_features > 0.5:
       remove_idx.append(i)
   remove_idx.sort(reverse=True)
   for i in remove_idx:
@@ -152,9 +152,10 @@ def NormalizeNumericalData(data):
 
 def MissingDataHandling(data):
   # Calculate similarity matrix
+  onehot_data = OneHotEncoding(data.copy())
   features = data.columns.tolist()
   indices = data.index.tolist()
-  normalized_data = NormalizeNumericalData(data)
+  normalized_data = NormalizeNumericalData(onehot_data)
 
   num_feature = len(features)
   num_sample = len(indices)
@@ -180,7 +181,7 @@ def MissingDataHandling(data):
   # Missing data handling
   num_try = 100
   for i in range(num_sample):
-    for f in numerical_fields:
+    for f in features:
       if np.isnan(data[f][indices[i]]):
         similarity_sample = similarity_mat[i]
         sorted_similarity_sample = sorted(similarity_sample, reverse=True)
@@ -294,13 +295,11 @@ def main():
     print file_name, "filter done"
 
     # One hot encoding for the categorical data
-    data = OneHotEncoding(data)
-    print file_name, "one hot encoding done"
-
-    # Reorder the dataframe
-    features = data.columns.tolist()
-    features.remove("PPTERM")
-    data = data[features+["PPTERM"]]
+    #data = OneHotEncoding(data)
+    #print file_name, "one hot encoding done"
+    #features = data.columns.tolist()
+    #features.remove("PPTERM")
+    #data = data[features+["PPTERM"]]
 
     data = MissingDataHandling(data)
     print "Missing done handling done"

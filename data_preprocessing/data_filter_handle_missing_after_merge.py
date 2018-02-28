@@ -56,7 +56,6 @@ def Filter(raw_data_file):
   global numerical_fields
   categorical_fields = []
   checkbox_fields = []
-  numerical_fields = []
   for column in data.columns:
     if column == "STUDY_ID":
       continue
@@ -135,16 +134,19 @@ def OneHotEncoding(data):
 
 def NormalizeNumericalData(data):
   new_data = data.copy()
-  for column in numerical_fields:
-    mean_ = new_data[column].mean()
-    var_ = new_data[column].var()
-    new_data[column] = (new_data[column] - mean_) / var_
-    max_ = new_data[column].max()
-    new_data[column] = new_data[column] / max_
   if "STUDY_ID" in list(new_data.columns):
     new_data.drop("STUDY_ID", axis=1, inplace=True)
   if "PPTERM" in list(new_data.columns):
     new_data.drop("PPTERM", axis=1, inplace=True)
+  for column in numerical_fields:
+    mean_ = new_data[column].mean()
+    var_ = new_data[column].var()
+    new_data[column] = (new_data[column] - mean_) / var_
+    min_ = new_data[column].min()
+    if min_ < 0:
+      new_data[column] = new_data[column] - min_
+    max_ = new_data[column].max()
+    new_data[column] = new_data[column] / max_
   return new_data
 
 def MissingDataHandling(data):
@@ -247,20 +249,18 @@ def Merge(data_list, file_list):
       data_list[key].to_csv("overlapped_"+key)
       continue
 
+  #num_samples = len(overlapped_study_id)
+  #new_index = range(num_samples)
+  #for key in data_list:
+  #  data_list[key].index = new_index
+  for key in file_list:
     if key != file_list[-1]:
       data_list[key].drop("PPTERM", axis=1, inplace=True)
-    if key != file_list[0]:
-      data_list[key].drop("STUDY_ID", axis=1, inplace=True)
-
-  num_samples = len(overlapped_study_id)
-  new_index = range(num_samples)
-  for key in data_list:
-    data_list[key].index = new_index
   
   # Merge data
-  data = pd.DataFrame(index=data_list[file_list[0]].index)
-  for key in data_list:
-    data = data.join(data_list[key])
+  v1_key = file_list[0]
+  v2_key = file_list[1]
+  data = data_list[v1_key].merge(data_list[v2_key], on='STUDY_ID')
 
   # Remove the STUDY_ID column
   data.drop("STUDY_ID", axis=1, inplace=True)
