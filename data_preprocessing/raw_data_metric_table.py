@@ -296,8 +296,10 @@ def main():
 
       if "v1" in file_name:
         feature_name = "V1"+f
-      if "v2" in file_name:
+      elif "v2" in file_name:
         feature_name = "V2"+f
+      else:
+        feature_name = f
 
       # Append the feature
       row.append(feature_name)
