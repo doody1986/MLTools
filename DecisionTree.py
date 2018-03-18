@@ -15,6 +15,10 @@ from sklearn.model_selection import KFold
 from sklearn import metrics
 import pydotplus as pydot
 
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import matplotlib
 
 ##################################################
 # data class to hold csv data
@@ -56,31 +60,30 @@ def preprocess(dataset, pos, neg, balanced, multiple_pos=1):
 
   for feat_index in range(len(dataset.features)):
 
-    neg_samples = filter(lambda x: x[dataset.label_index] == negative, dataset.examples)
-    feat_values_neg_samples = [example[feat_index] for example in neg_samples]
-             
-    pos_samples = filter(lambda x: x[dataset.label_index] == positive, dataset.examples)
-    feat_values_pos_samples = [example[feat_index] for example in pos_samples]
-        
-    feat_values_counts_neg = Counter(feat_values_neg_samples)
-    major_feat_value_neg = feat_values_counts_neg.most_common(1)[0][0]
-    if major_feat_value_neg == '?' or major_feat_value_neg == '':
-      major_feat_value_neg = feat_values_counts_neg.most_common(2)[1][0]
+    #neg_samples = filter(lambda x: x[dataset.label_index] == negative, dataset.examples)
+    #feat_values_neg_samples = [example[feat_index] for example in neg_samples]
+    #         
+    #pos_samples = filter(lambda x: x[dataset.label_index] == positive, dataset.examples)
+    #feat_values_pos_samples = [example[feat_index] for example in pos_samples]
+    #    
+    #feat_values_counts_neg = Counter(feat_values_neg_samples)
+    #major_feat_value_neg = feat_values_counts_neg.most_common(1)[0][0]
+    #if major_feat_value_neg == '?' or major_feat_value_neg == '':
+    #  major_feat_value_neg = feat_values_counts_neg.most_common(2)[1][0]
 
-    feat_values_counts_pos = Counter(feat_values_pos_samples)
-    major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
-    if major_feat_value_pos == '?' or major_feat_value_pos == '':
-      major_feat_value_pos = feat_values_counts_pos.most_common(2)[1][0]
-    
+    #feat_values_counts_pos = Counter(feat_values_pos_samples)
+    #major_feat_value_pos = feat_values_counts_pos.most_common(1)[0][0]
+    #if major_feat_value_pos == '?' or major_feat_value_pos == '':
+    #  major_feat_value_pos = feat_values_counts_pos.most_common(2)[1][0]
+
+    feat_values = [example[feat_index] for example in dataset.examples]
+
+    feat_values_counts = Counter(feat_values)
+    major_feat_value = feat_values_counts.most_common(1)[0][0]
+
     for example in dataset.examples:
       if (example[feat_index] == '?' or example[feat_index] == ''):
-        if (example[dataset.label_index] == negative):
-          example[feat_index] = major_feat_value_neg
-        elif (example[dataset.label_index] == positive):
-          example[feat_index] = major_feat_value_pos
-        else:
-          print "No label for this example"
-          exit()
+        example[feat_index] = major_feat_value
 
     #convert features that are numeric to floats
     for example in dataset.examples:
@@ -118,6 +121,9 @@ class treeNode():
     self.upper_child = None
     self.lower_child = None
     self.height = None
+    self.num_pos = 0
+    self.num_neg = 0
+    self.metric = 0
 
 ##################################################
 # compute tree recursively
@@ -144,6 +150,8 @@ def compute_tree(dataset, parent_node, label_name):
 
   num_pos = pos_count(dataset.examples, dataset.features, label_name)
   num_neg = len(dataset.examples) - num_pos
+  node.num_pos = num_pos
+  node.num_neg = num_neg
   if (len(dataset.examples) == num_pos):
     node.classification = 2
     node.is_leaf = True
@@ -164,9 +172,11 @@ def compute_tree(dataset, parent_node, label_name):
   min_gain = 0.01
   dataset_entropy = calc_dataset_entropy(dataset, label_name)
   dataset_auc = 0.5
-  for feat_index in range(len(dataset.examples[0])):
+  max_auc = 0
+  for feat_index in range(len(dataset.features)):
     if (dataset.features[feat_index] != label_name):
       local_max_gain = 0
+      local_max_auc = 0
       local_split_val = None
       # these are the values we can split on, now we must find the best one
       feat_value_list = [example[feat_index] for example in dataset.examples]
@@ -187,14 +197,22 @@ def compute_tree(dataset, parent_node, label_name):
         # calculate the gain if we split on this value
         #local_gain = calc_info_gain(dataset, dataset_entropy, val, feat_index)
         # calculate the gain if we split on this value
-        local_gain = calc_gain_auc(dataset, dataset_auc, val, feat_index)
+        results_tuple = calc_gain_auc(dataset, dataset_auc, val, feat_index)
+        local_gain = results_tuple[0]
+        local_auc = results_tuple[1]
+        #if dataset.features[feat_index] == "PESTSTOREV2":
+        #  print dataset.features[feat_index], " ", val, " ", local_auc
+        #if dataset.features[feat_index] == "PESTIAPPAFREQ":
+        #  print dataset.features[feat_index], " ", val, " ", local_auc
  
         if (local_gain > local_max_gain):
           local_max_gain = local_gain
           local_split_val = val
+          local_max_auc = local_auc
 
       if (local_max_gain > max_gain):
         max_gain = local_max_gain
+        max_auc = local_max_auc
         split_val = local_split_val
         feat_to_split = feat_index
 
@@ -208,13 +226,16 @@ def compute_tree(dataset, parent_node, label_name):
 
     return node
 
+  #exit()
   node.feat_split_index = feat_to_split
   node.feat_split = dataset.features[feat_to_split]
   node.feat_split_value = split_val
+  node.metric = max_auc
 
   # currently doing one split per node so only two datasets are created
   upper_dataset = data(label_name)
   lower_dataset = data(label_name)
+  #subset_features = dataset.features[0:node.feat_split_index]+dataset.features[node.feat_split_index+1:len(dataset.features)]
   upper_dataset.features = dataset.features
   lower_dataset.features = dataset.features
   for example in dataset.examples:
@@ -298,10 +319,9 @@ def calc_gain_auc(dataset, auc, val, feat_index):
       gain_upper_dataset.examples.append(example)
     elif (example[feat_index] < val):
       gain_lower_dataset.examples.append(example)
-
   #Splitting didn't actually split (we tried to split on the max or min of the attribute's range)
   if (len(gain_upper_dataset.examples) == 0 or len(gain_lower_dataset.examples) == 0):
-    return -1
+    return (-1, -1)
 
   num_total = len(dataset.examples);
   num_positive = pos_count(dataset.examples, dataset.features, label_name)
@@ -320,7 +340,13 @@ def calc_gain_auc(dataset, auc, val, feat_index):
   else:
     feat_auc = float(num_positive_lower_dataset * num_negative + num_positive * num_negative_upper_dataset) / float(2 * num_positive * num_negative)
 
-  return feat_auc - auc
+  #if dataset.features[feat_index] == "PESTIAPPAFREQ":
+  #  print "Number of positive in upper", num_positive_upper_dataset
+  #  print "Number of negative in upper", num_negative_upper_dataset
+  #  print "Number of positive in lower", num_positive_lower_dataset
+  #  print "Number of negative in lower", num_negative_lower_dataset
+  #  exit()
+  return (feat_auc - auc, feat_auc)
 
 ##################################################
 # count number of examples with classification "1"
@@ -473,51 +499,55 @@ def tree_node_stats(node, feature_list, max_height):
 # Visualize tree
 ##################################################
 POS_NODE_STYLE = {'shape': 'box',
-                  'fillcolor': '#bd1e24',
                   'style': 'filled'}
 NEG_NODE_STYLE = {'shape': 'box',
-                  'fillcolor': '#007256',
                   'style': 'filled'}
 POS_LEAF_STYLE = {'shape': 'ellipse',
                   'fillcolor': '#bd1e24',
-                  'style': 'filled'}
+                  'style': 'filled',
+                  'fontcolor': 'white'}
 NEG_LEAF_STYLE = {'shape': 'ellipse',
                   'fillcolor': '#007256',
-                  'style': 'filled'}
+                  'style': 'filled',
+                  'fontcolor': 'white'}
 
 def visualize_tree(root, max_height):
   graph = pydot.Dot('DecisionTree', graph_type='digraph')
-  build_tree_graph(graph, root, None, max_height)
+  build_tree_graph(graph, root, None, "", max_height)
   graph.write_png('selected_decision_tree.png')
 
 node_id = 0
-def build_tree_graph(graph, node, graph_node, max_height):
+def build_tree_graph(graph, node, graph_node, edge_label, max_height):
   if node.is_leaf == True or node.height == max_height:
+    global node_id
+    node_id += 1
     if node.classification == 2:
       leaf_label = "Pre-term"
       #leaf_label = "Malignant"
-      leaf = pydot.Node(leaf_label, **POS_LEAF_STYLE)
+      leaf = pydot.Node(node_id, label=leaf_label, **POS_LEAF_STYLE)
     elif node.classification == 1:
       leaf_label = "Term"
       #leaf_label = "Benign"
-      leaf = pydot.Node(leaf_label, **NEG_LEAF_STYLE)
+      leaf = pydot.Node(node_id, label=leaf_label, **NEG_LEAF_STYLE)
     graph.add_node(leaf)
-    edge = pydot.Edge(graph_node, leaf)
+    edge = pydot.Edge(graph_node, leaf, label=edge_label)
     graph.add_edge(edge)
   else:
     global node_id
-    node_label = str(node_id)+"\n"+node.feat_split+" >= "+str(node.feat_split_value)
+    node_label = node.feat_split+" >= "+str(node.feat_split_value)+"\n"+\
+                 "NumPos "+str(node.num_pos)+" NumNeg "+str(node.num_neg)+"\n"+\
+                 "AUC "+str(round(node.metric, 2))
     node_id += 1
     if node.classification == 2:
-      local_graph_node = pydot.Node(node_label, **POS_NODE_STYLE)
+      local_graph_node = pydot.Node(node_id, label=node_label, **POS_NODE_STYLE)
     elif node.classification == 1:
-      local_graph_node = pydot.Node(node_label, **NEG_NODE_STYLE)
+      local_graph_node = pydot.Node(node_id, label=node_label, **NEG_NODE_STYLE)
     graph.add_node(local_graph_node)
     if graph_node != None:
-      edge = pydot.Edge(graph_node, local_graph_node)
+      edge = pydot.Edge(graph_node, local_graph_node, label=edge_label)
       graph.add_edge(edge)
-    build_tree_graph(graph, node.lower_child, local_graph_node, max_height)
-    build_tree_graph(graph, node.upper_child, local_graph_node, max_height)
+    build_tree_graph(graph, node.lower_child, local_graph_node, "No", max_height)
+    build_tree_graph(graph, node.upper_child, local_graph_node, "Yes", max_height)
 
 ##################################################
 # main function, organize data and execute functions based on input
@@ -565,8 +595,6 @@ def main():
   test_dataset = data(label_name)
   training_dataset.features = dataset.features
   test_dataset.features = dataset.features
-  #training_dataset.feat_types = dataset.feat_types
-  #test_dataset.feat_types = dataset.feat_types
   for a in range(len(dataset.features)):
     if training_dataset.features[a] == training_dataset.label_name:
       training_dataset.label_index = a
@@ -582,7 +610,7 @@ def main():
   if balanced == True:
     num_preterm = int(args[3])
     print "number of preterm label: ", num_preterm
-    preprocess(dataset, '2', '1', balanced, num_preterm)
+    preprocess(dataset, 2, 1, balanced, num_preterm)
   preprocess(dataset, '2', '1', balanced)
 
   data_samples = []
@@ -598,7 +626,7 @@ def main():
   print "The number of negative sample is: ", len(negative_set)
   print "The number of positive sample is: ", len(positive_set)
 
-  num_rounds = 10
+  num_rounds = 1
   final_accuracy = 0.0
   final_false_positive_rate = 0.0
   final_false_negative_rate = 0.0
@@ -608,6 +636,7 @@ def main():
   ref_false_negative_rate = 1.0
   # Start 10 rounds 10-fold cross validation
   for i in range(num_rounds):
+    print "Round "+str(i+1)+" Started"
     n_folds = 10
     cv_arg = KFold(n_folds, shuffle=True)
     root = None
@@ -615,6 +644,7 @@ def main():
     false_negative_rate = 0.0
     false_positive_rate = 0.0
     true_positive_rate = 0.0
+    local_round = 0
     for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
       results = []
       training_dataset.examples = [ data_samples[i] for i in train_idx ]
@@ -648,6 +678,7 @@ def main():
           true_positive_count += 1
       if preterm_count == 0:
         continue
+      local_round += 1
       accuracy += float(accurate_count) / float(len(results))
       false_negative_rate += float(false_negative_count) / float(preterm_count)
       false_positive_rate += float(false_positive_count) / float(term_count)
@@ -656,70 +687,76 @@ def main():
         selected_tree = root
         ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
 
-    final_accuracy += accuracy / n_folds
-    final_false_negative_rate += false_negative_rate / n_folds
-    final_false_positive_rate += false_positive_rate / n_folds
-    final_true_positive_rate += true_positive_rate / n_folds
+    final_accuracy += accuracy / local_round
+    final_false_negative_rate += false_negative_rate / local_round
+    final_false_positive_rate += false_positive_rate / local_round
+    final_true_positive_rate += true_positive_rate / local_round
 
   print "Final accuracy: " + str(final_accuracy / num_rounds)
   print "Final false negative rate: " + str(final_false_negative_rate / num_rounds)
   print "Final false positive rate: " + str(final_false_positive_rate / num_rounds)
+
+  counter_dict = Counter(feature_list)
+  print counter_dict
+  counter_list = []
+  key_list = []
+  for pair in counter_dict.most_common():
+    key_list.append(pair[0])
+    counter_list.append(pair[1])
+
+  # Plot parameter
+  opacity = 1.0
+  bar_width = 1.
+  color_map = [
+    '#E8EAF6',
+    '#C5CAE9',
+    '#9FA8DA',
+    '#7986CB',
+    '#5C6BC0',
+    '#3F51B5',
+    '#3949AB',
+    '#303F9F',
+    '#283593',
+    '#1A237E',
+  ]
+
+  xtick_name_list = key_list
+  n_groups = len(xtick_name_list)
+
+  matplotlib.rc('font', size=20)
+  fig = plt.figure(figsize=(15, 10))
+  ax = fig.add_subplot(111)
+
+  index = np.arange(n_groups) * bar_width
+  ax.bar(index, counter_list, bar_width,
+         align='center',
+         alpha=opacity,
+         color=color_map[0],
+         linewidth=3,
+         label="Number of Occurence of Selected Features")
+ 
+  ax.set_xlabel('Selected Features')
+  ax.set_ylabel('Number of Occurence')
   
-  print Counter(feature_list)
+  ax.margins(x=0)
+  ax.yaxis.grid()
+  ax.set_xticks([])
+  ##ax.set_xticklabels(layer_list[len(layer_list)-len(gpu_dict[kernel][metric]):])
+  #ax.set_xticklabels(xtick_name_list, rotation='45', ha='right')
+  #ax.set_xticklabels(xtick_name_list)
+  #ax.legend(bbox_to_anchor=(1.05, 1), loc=2,
+  #           ncol=1, borderaxespad=0.)
+  ax.legend(bbox_to_anchor=(0.35, 1.02, 0.65, .102), loc=3,
+            ncol=1, mode="expand", borderaxespad=0.)
+
+  fig.tight_layout()
+  fig.savefig('./counter.png', format='png', bbox_inches='tight')
+  
   print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate / num_rounds, 1.0], [0.0, final_true_positive_rate/num_rounds, 1.0])
 
   max_height = 5
   visualize_tree(selected_tree, max_height)
 
-  #if ("-s" in args):
-  #  print_disjunctive(root, dataset, "")
-  #  print "\n"
-  #if ("-v" in args):
-  #  datavalidate = args[args.index("-v") + 1]
-  #  print "Validating tree..."
-
-  #  validateset = data(label_name)
-  #  read_data(validateset, datavalidate, datatypes)
-  #  for a in range(len(dataset.features)):
-  #    if validateset.features[a] == validateset.label_name:
-  #      validateset.label_index = a
-  #    else:
-  #      validateset.label_index = range(len(validateset.features))[-1]
-  #  preprocess2(validateset)
-  #  best_score = validate_tree(root, validateset)
-  #  all_ex_score = copy.deepcopy(best_score)
-  #  print "Initial (pre-pruning) validation set score: " + str(100*best_score) +"%"
-  #if ("-p" in args):
-  #  if("-v" not in args):
-  #    print "Error: You must validate if you want to prune"
-  #  else:
-  #    post_prune_accuracy = 100*prune_tree(root, root, validateset, best_score)
-  #    print "Post-pruning score on validation set: " + str(post_prune_accuracy) + "%"
-  #if ("-t" in args):
-  #  datatest = args[args.index("-t") + 1]
-  #  testset = data(label_name)
-  #  read_data(testset, datatest, datatypes)
-  #  for a in range(len(dataset.features)):
-  #    if testset.features[a] == testset.label_name:
-  #      testset.label_index = a
-  #    else:
-  #      testset.label_index = range(len(testset.features))[-1]
-  #  print "Testing model on " + str(datatest)
-  #  for example in testset.examples:
-  #    example[testset.label_index] = '0'
-  #  testset.examples[0][testset.label_index] = '1'
-  #  testset.examples[1][testset.label_index] = '1'
-  #  testset.examples[2][testset.label_index] = '?'
-  #  preprocess2(testset)
-  #  b = open('results.csv', 'w')
-  #  a = csv.writer(b)
-  #  for example in testset.examples:
-  #    example[testset.label_index] = test_example(example, root, testset.label_index)
-  #  saveset = testset
-  #  saveset.examples = [saveset.features] + saveset.examples
-  #  a.writerows(saveset.examples)
-  #  b.close()
-  #  print "Testing complete. Results outputted to results.csv"
       
 if __name__ == "__main__":
   main()
