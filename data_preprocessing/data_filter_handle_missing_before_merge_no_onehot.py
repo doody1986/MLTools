@@ -46,7 +46,7 @@ checkbox_fields = []
 numerical_fields = []
 def Filter(raw_data_file):
   data = pd.read_csv(raw_data_file)
-  no_ambiguous_data = True
+  no_ambiguous_data = False
   if no_ambiguous_data:
     data.replace(888, np.nan, inplace=True, regex=True)
     data.replace(999, np.nan, inplace=True, regex=True)
@@ -72,7 +72,7 @@ def Filter(raw_data_file):
     remove = True
     valid_fields_count = collections.Counter(null_flags)[False]
     valid_proportion_by_sample = float(valid_fields_count) / float(len(null_flags))
-    if valid_proportion_by_sample > 0.5:
+    if valid_proportion_by_sample > 0.8:
       remove = False
 
     if remove == True:
@@ -102,7 +102,7 @@ def Filter(raw_data_file):
         null_count += 1
 
     null_proportion_by_features = float(null_count) / num_features
-    if null_proportion_by_features > 0.5:
+    if null_proportion_by_features > 0.2:
       remove_idx.append(i)
   remove_idx.sort(reverse=True)
   for i in remove_idx:
@@ -310,7 +310,7 @@ def main():
   data = Merge(data_list, arg_list)
   print "Merge done"
 
-  data.to_csv("combined_v1_v2.csv", index=False)
+  data.to_csv("combined_v1_v2_missing_handling_before_merge.csv", index=False)
   print ("End program.")
   return 0
 

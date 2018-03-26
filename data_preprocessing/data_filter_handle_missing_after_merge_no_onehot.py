@@ -46,7 +46,7 @@ checkbox_fields = []
 numerical_fields = []
 def Filter(raw_data_file):
   data = pd.read_csv(raw_data_file)
-  no_ambiguous_data = True
+  no_ambiguous_data = False
   if no_ambiguous_data:
     data.replace(888, np.nan, inplace=True, regex=True)
     data.replace(999, np.nan, inplace=True, regex=True)
@@ -54,8 +54,6 @@ def Filter(raw_data_file):
   global categorical_fields
   global checkbox_fields
   global numerical_fields
-  categorical_fields = []
-  checkbox_fields = []
   for column in data.columns:
     if column == "STUDY_ID":
       continue
@@ -79,11 +77,14 @@ def Filter(raw_data_file):
     else:
       # Find the specific field based on current data 
       if column in global_categorical_fields:
-        categorical_fields.append(column)
+        if column not in categorical_fields:
+          categorical_fields.append(column)
       if column in global_checkbox_fields:
-        checkbox_fields.append(column)
+        if column not in checkbox_fields:
+          checkbox_fields.append(column)
       if column in global_numerical_fields:
-        numerical_fields.append(column)
+        if column not in numerical_fields:
+          numerical_fields.append(column)
 
   print "The column number of raw data AFTER filtered is: " + str(len(data.columns))
 
@@ -138,6 +139,7 @@ def NormalizeNumericalData(data):
     new_data.drop("STUDY_ID", axis=1, inplace=True)
   if "PPTERM" in list(new_data.columns):
     new_data.drop("PPTERM", axis=1, inplace=True)
+  global numerical_fields
   for column in numerical_fields:
     mean_ = new_data[column].mean()
     var_ = new_data[column].var()
@@ -180,7 +182,7 @@ def MissingDataHandling(data):
   # Missing data handling
   num_try = 100
   for i in range(num_sample):
-    for f in numerical_fields:
+    for f in features:
       if np.isnan(data[f][indices[i]]):
         similarity_sample = similarity_mat[i]
         sorted_similarity_sample = sorted(similarity_sample, reverse=True)
@@ -198,6 +200,8 @@ def MissingDataHandling(data):
   return data
 
 def Merge(data_list, file_list):
+  global categorical_fields
+  global checkbox_fields
   feature_list = []
   study_id_list = []
   for file_name in file_list:
@@ -236,8 +240,19 @@ def Merge(data_list, file_list):
       if feature != "STUDY_ID" and feature != "PPTERM":
         if "v1" in key:
           data_list[key]=data_list[key].rename(columns = {feature:feature+"V1"})
+            
         if "v2" in key:
           data_list[key]=data_list[key].rename(columns = {feature:feature+"V2"}) 
+
+  for feature in overlapped_features:
+    if feature in categorical_fields:
+      categorical_fields.remove(feature)
+      categorical_fields.append(feature+"V1")
+      categorical_fields.append(feature+"V2")
+    if feature in checkbox_fields:
+      checkbox_fields.remove(feature)
+      checkbox_fields.append(feature+"V1")
+      checkbox_fields.append(feature+"V2")
 
     remove_idx = []
     for study_id in unique_study_id:
@@ -309,7 +324,7 @@ def main():
   data = MissingDataHandling(data)
   print "Missing done handling done"
 
-  data.to_csv("combined_v1_v2.csv", index=False)
+  data.to_csv("combined_v1_v2_missing_handling_after_merge.csv", index=False)
   print ("End program.")
   return 0
 
