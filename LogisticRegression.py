@@ -69,6 +69,7 @@ def Run(data, label):
   final_false_positive_rate /= num_rounds
   final_true_positive_rate /= num_rounds
   final_auc = metrics.auc([0.0, final_false_positive_rate, 1.0], [0.0, final_true_positive_rate, 1.0])
+  final_fscore = metrics.fbeta_score(ref, result, 2)
         
   #print "Averaged metrics"
   #print final_accuracy
@@ -76,6 +77,6 @@ def Run(data, label):
   #print final_false_positive_rate
   #print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate, 1.0], [0.0, final_true_positive_rate, 1.0])
 
-  return (final_accuracy, final_auc)
+  return (final_accuracy, final_auc, final_fscore)
 
 
