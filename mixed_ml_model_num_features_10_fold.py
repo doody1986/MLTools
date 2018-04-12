@@ -75,9 +75,9 @@ def main():
   num_features_list = []
   for b in range(1, 11):
     num_feature_auc = 0
-    accuracy_auc, auc_auc, fscore_auc, num_feature_auc, feature_list_auc, _ = dt.Run(file_name, "PPTERM", b, "AUC")
+    accuracy_auc, auc_auc, fscore_auc, num_feature_auc, feature_list_auc, _ = dt.Run(data, "PPTERM", b, "AUC")
     num_feature_ig = 0
-    accuracy_ig, auc_ig, fscore_ig, num_feature_ig, feature_list_ig, _ = dt.Run(file_name, "PPTERM", b, "IG")
+    accuracy_ig, auc_ig, fscore_ig, num_feature_ig, feature_list_ig, _ = dt.Run(data, "PPTERM", b, "IG")
     accuracy_dt.append([b, accuracy_auc, accuracy_ig])
     auc_dt.append([b, auc_auc, auc_ig])
     fscore_dt.append([b, fscore_auc, fscore_ig])

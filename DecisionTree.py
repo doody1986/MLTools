@@ -34,13 +34,11 @@ class data():
 ##################################################
 # function to read in data from the .csv files
 ##################################################
-def read_data(dataset, datafile, datatypes):
-  print "Reading CSV data..."
-  data = pd.read_csv(datafile)
-  dataset.examples = data[data.columns.tolist()].as_matrix().tolist()
+def read_data(dataset, input_data, datatypes):
+  dataset.examples = input_data[input_data.columns.tolist()].as_matrix().tolist()
 
   #list features
-  dataset.features = data.columns.tolist()
+  dataset.features = input_data.columns.tolist()
   print "The number of features is: ", len(dataset.features)-1
 
 ##################################################
@@ -497,12 +495,11 @@ def prune_tree_graph(graph, node, graph_node, edge_label, max_height):
 # need to account for missing data
 ##################################################
 
-def Run(file_name, label_name, max_height, method):
+def Run(input_data, label_name, max_height, method):
 
-  datafile = file_name
   dataset = data("")
   datatypes = None
-  read_data(dataset, datafile, datatypes)
+  read_data(dataset, input_data, datatypes)
   arg3 = label_name
   if (arg3 in dataset.features):
     label_name = arg3
