@@ -11,72 +11,90 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
 from sklearn import metrics
 
+import NMI as nmi
+import LinearCorr as linear
 
-def Run(data, label):
-  x = data
-  y = label
-  num_features = x.shape[1]
-  num_samples = x.shape[0]
+
+def Run(data, num_features, label_name, ranking_method):
+  features = data.columns.tolist()
+  indices = data.index.tolist()
+  features.remove(label_name)
+  x = data[features]
+  y = data[label_name].as_matrix()
 
   n_folds = 10
-  final_accuracy = 0.0
-  final_false_positive_rate = 0.0
-  final_false_negative_rate = 0.0
-  final_true_positive_rate = 0.0
+  accuracy_list = []
+  false_positive_rate_list = []
+  false_negative_rate_list = []
+  true_positive_rate_list = []
+  auc_list = []
+  fscore_list = []
   cv_arg = KFold(n_folds, shuffle=True)
   num_rounds = 0
-  for train_idx, test_idx in cv_arg.split(x):
-    train_set = x[train_idx]
+  for train_idx, test_idx in cv_arg.split(x.as_matrix()):
+    # x is data frame while y is numpy array
+    ranked_features = []
+    selected_features = []
+    train_set = x.iloc[train_idx]
     train_label = y[train_idx]
-    test_set = x[test_idx]
+    test_set = x.iloc[test_idx]
     ref = y[test_idx]
-    
+
+    for f in features:
+      data_f = train_set[f].as_matrix()
+      if ranking_method == "NMI":
+        ranked_features.append((f, nmi.Calc(data_f, train_label)))
+      elif ranking_method == "Linear":
+        ranked_features.append((f, linear.Calc(data_f, train_label)))
+      else:
+        print "Unrecognized feature ranking method"
+        exit()
+    ranked_features = sorted(ranked_features, key=lambda x:x[1], reverse=True)
+    selected_features = [f_i[0] for f_i in ranked_features]
+    selected_features = selected_features[:num_features]
+    train_set_array = train_set[selected_features].as_matrix()
+    test_set_array = test_set[selected_features].as_matrix()
+
     logreg = linear_model.LogisticRegression()
-    logreg.fit(train_set, train_label)
-    result = logreg.predict(test_set)
+    logreg.fit(train_set_array, train_label)
+    results = logreg.predict(test_set_array)
     count = 0
     true_positive_count = 0
     false_negative_count = 0
     false_positive_count = 0
     preterm_count = 0
     term_count = 0
-    for i in range(len(result)):
-      if result[i] == ref[i]:
+    for i in range(len(results)):
+      if results[i] == ref[i]:
         count += 1
       if ref[i] == 2:
         preterm_count += 1
       if ref[i] == 1:
         term_count += 1
       # False negative
-      if ref[i] == 2 and result[i] == 1:
+      if ref[i] == 2 and results[i] == 1:
         false_negative_count += 1
       # False positive
-      if ref[i] == 1 and result[i] == 2:
+      if ref[i] == 1 and results[i] == 2:
         false_positive_count += 1
       # True positive
-      if ref[i] == 2 and result[i] == 2:
+      if ref[i] == 2 and results[i] == 2:
         true_positive_count += 1
     if preterm_count == 0:
       continue
     num_rounds += 1
-    final_accuracy += float(count) / float(len(result))
-    final_false_negative_rate += float(false_negative_count) / float(preterm_count)
-    final_false_positive_rate += float(false_positive_count) / float(term_count)
-    final_true_positive_rate += float(true_positive_count) / float(preterm_count)
+    accuracy = float(count) / float(len(results))
+    false_negative_rate = float(false_negative_count) / float(preterm_count)
+    false_positive_rate = float(false_positive_count) / float(term_count)
+    true_positive_rate = float(true_positive_count) / float(preterm_count)
 
-  final_accuracy /= num_rounds
-  final_false_negative_rate /= num_rounds
-  final_false_positive_rate /= num_rounds
-  final_true_positive_rate /= num_rounds
-  final_auc = metrics.auc([0.0, final_false_positive_rate, 1.0], [0.0, final_true_positive_rate, 1.0])
-  final_fscore = metrics.fbeta_score(ref, result, 2)
+    accuracy_list.append(accuracy)
+    false_negative_rate_list.append(false_negative_rate)
+    false_positive_rate_list.append(false_positive_rate)
+    true_positive_rate_list.append(true_positive_rate)
+    auc_list.append(metrics.auc([0.0, false_positive_rate, 1.0], [0.0, true_positive_rate, 1.0]))
+    fscore_list.append(metrics.fbeta_score(ref, results, 2))
         
-  #print "Averaged metrics"
-  #print final_accuracy
-  #print final_false_negative_rate
-  #print final_false_positive_rate
-  #print "Final AUC: ", metrics.auc([0.0, final_false_positive_rate, 1.0], [0.0, final_true_positive_rate, 1.0])
-
-  return (final_accuracy, final_auc, final_fscore)
+  return (accuracy_list, auc_list, fscore_list)
 
 

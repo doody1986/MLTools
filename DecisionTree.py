@@ -45,7 +45,7 @@ def read_data(dataset, input_data, datatypes):
 # tree node class that will make up the tree
 ##################################################
 class treeNode():
-  def __init__(self, is_leaf, classification, feat_split_index, feat_split_value, parent, upper_child, lower_child, height):
+  def __init__(self, parent):
     self.is_leaf = True
     self.classification = None
     self.feat_split = None
@@ -54,7 +54,7 @@ class treeNode():
     self.parent = parent
     self.upper_child = None
     self.lower_child = None
-    self.height = None
+    self.height = 0
     self.num_pos = 0
     self.num_neg = 0
     self.metric = 0
@@ -76,7 +76,7 @@ class treeNode():
   # return tree 
 
 def compute_tree(dataset, parent_node, label_name, max_height, method):
-  node = treeNode(True, None, None, None, parent_node, None, None, 0)
+  node = treeNode(parent_node)
   if (parent_node == None):
     node.height = 0
   else:
@@ -398,7 +398,7 @@ def tree_node_stats(node, feature_list, max_height):
   if node.height == max_height:
     return
   else:
-    feature_list.append(node.feat_split)
+    feature_list.append((node.feat_split, node.height))
     tree_node_stats(node.upper_child, feature_list, max_height)
     tree_node_stats(node.lower_child, feature_list, max_height)
     return
@@ -540,84 +540,125 @@ def Run(input_data, label_name, max_height, method):
   print "The number of negative sample is: ", len(negative_set)
   print "The number of positive sample is: ", len(positive_set)
 
-  num_rounds = 1
-  final_accuracy = 0.0
-  final_false_positive_rate = 0.0
-  final_false_negative_rate = 0.0
-  final_true_positive_rate = 0.0
+  accuracy_list = []
+  false_positive_rate_list = []
+  false_negative_rate_list = []
+  true_positive_rate_list = []
+  auc_list = []
+  fscore_list = []
   ref_false_negative_rate = 1.0
-  # Start 10 rounds 10-fold cross validation
-  for i in range(num_rounds):
-    print "Round "+str(i+1)+" Started"
-    n_folds = 10
-    cv_arg = KFold(n_folds, shuffle=True)
-    root = None
-    accuracy = 0.0
-    false_negative_rate = 0.0
-    false_positive_rate = 0.0
-    true_positive_rate = 0.0
-    local_round = 0
-    avg_num_feature = 0
-    feature_list = []
-    selected_tree = None
-    for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
-      results = []
-      local_feature_list = []
-      training_dataset.examples = [ data_samples[i] for i in train_idx ]
-      test_dataset.examples = [ data_samples[i] for i in test_idx ]
-      root = compute_tree(training_dataset, None, label_name, max_height, method)
-      tree_node_stats(root, local_feature_list, max_height)
-      feature_list = feature_list + local_feature_list
-      avg_num_feature += len(Counter(local_feature_list))
-      for example in test_dataset.examples:
-        results.append(test_example(example, root))
-      ref = [example[test_dataset.label_index] for example in test_dataset.examples]
-      accurate_count = 0
-      false_negative_count = 0
-      false_positive_count = 0
-      true_positive_count = 0
-      preterm_count = 0
-      term_count = 0
-      for i in range(len(results)):
-        if results[i] == ref[i]:
-          accurate_count += 1
-        if ref[i] == 2:
-          preterm_count += 1
-        if ref[i] == 1:
-          term_count += 1
-        # False negative
-        if ref[i] == 2 and results[i] == 1:
-          false_negative_count += 1
-        # False positive
-        if ref[i] == 1 and results[i] == 2:
-          false_positive_count += 1
-        # True positive
-        if ref[i] == 2 and results[i] == 2:
-          true_positive_count += 1
-      if preterm_count == 0:
-        continue
-      local_round += 1
-      accuracy += float(accurate_count) / float(len(results))
-      false_negative_rate += float(false_negative_count) / float(preterm_count)
-      false_positive_rate += float(false_positive_count) / float(term_count)
-      true_positive_rate += float(true_positive_count) / float(preterm_count)
-      if (float(false_negative_count) / float(preterm_count)) < ref_false_negative_rate:
-        selected_tree = root
-        ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
+  # Start 10-fold cross validation
+  n_folds = 10
+  cv_arg = KFold(n_folds, shuffle=True)
+  root = None
+  avg_num_feature = 0
+  counts = 0
+  feature_list = []
+  selected_tree = None
+  for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
+    results = []
+    local_feature_list = []
+    training_dataset.examples = [ data_samples[i] for i in train_idx ]
+    test_dataset.examples = [ data_samples[i] for i in test_idx ]
+    root = compute_tree(training_dataset, None, label_name, max_height, method)
+    tree_node_stats(root, local_feature_list, max_height)
+    feature_list = feature_list + [i[0] for i in local_feature_list]
+    avg_num_feature += len(Counter(local_feature_list))
+    for example in test_dataset.examples:
+      results.append(test_example(example, root))
+    ref = [example[test_dataset.label_index] for example in test_dataset.examples]
+    accurate_count = 0
+    false_negative_count = 0
+    false_positive_count = 0
+    true_positive_count = 0
+    preterm_count = 0
+    term_count = 0
+    for i in range(len(results)):
+      if results[i] == ref[i]:
+        accurate_count += 1
+      if ref[i] == 2:
+        preterm_count += 1
+      if ref[i] == 1:
+        term_count += 1
+      # False negative
+      if ref[i] == 2 and results[i] == 1:
+        false_negative_count += 1
+      # False positive
+      if ref[i] == 1 and results[i] == 2:
+        false_positive_count += 1
+      # True positive
+      if ref[i] == 2 and results[i] == 2:
+        true_positive_count += 1
+    if preterm_count == 0:
+      continue
+    counts += 1
+    accuracy = float(accurate_count) / float(len(results))
+    false_negative_rate = float(false_negative_count) / float(preterm_count)
+    false_positive_rate = float(false_positive_count) / float(term_count)
+    true_positive_rate = float(true_positive_count) / float(preterm_count)
+    if (float(false_negative_count) / float(preterm_count)) < ref_false_negative_rate:
+      selected_tree = root
+      ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
 
-    final_accuracy = accuracy / local_round
-    final_false_negative_rate = false_negative_rate / local_round
-    final_false_positive_rate = false_positive_rate / local_round
-    final_true_positive_rate = true_positive_rate / local_round
-    avg_num_feature = round(float(avg_num_feature) / float(local_round))
+    accuracy_list.append(accuracy)
+    false_negative_rate_list.append(false_negative_rate)
+    false_positive_rate_list.append(false_positive_rate)
+    true_positive_rate_list.append(true_positive_rate)
+    auc_list.append(metrics.auc([0.0, false_positive_rate, 1.0], [0.0, true_positive_rate, 1.0]))
+    fscore_list.append(metrics.fbeta_score(ref, results, 2))
 
-  #print "Final accuracy: " + str(final_accuracy)
-  #print "Final false negative rate: " + str(final_false_negative_rate)
-  #print "Final false positive rate: " + str(final_false_positive_rate)
-  auc = metrics.auc([0.0, final_false_positive_rate / num_rounds, 1.0], [0.0, final_true_positive_rate/num_rounds, 1.0])
-  final_fscore = metrics.fbeta_score(ref, results, 2)
-  #print "Final AUC: ", auc
-  return (final_accuracy, auc, final_fscore, avg_num_feature, feature_list, selected_tree)
+  avg_num_feature = round(float(avg_num_feature) / float(counts))
+
+  return (accuracy_list, auc_list, fscore_list, avg_num_feature, feature_list, selected_tree)
+
+def SelectFeature(input_data, label_name, method):
+
+  dataset = data("")
+  datatypes = None
+  read_data(dataset, input_data, datatypes)
+  arg3 = label_name
+  if (arg3 in dataset.features):
+    label_name = arg3
+  else:
+    label_name = dataset.features[-1]
+
+  dataset.label_name = label_name
+
+  #find index of label_name
+  for a in range(len(dataset.features)):
+    if dataset.features[a] == dataset.label_name:
+      dataset.label_index = a
+    else:
+      dataset.label_index = range(len(dataset.features))[-1]
+      
+  # Split the data set into training and test set
+  training_dataset = data(label_name)
+  test_dataset = data(label_name)
+  training_dataset.features = dataset.features
+  test_dataset.features = dataset.features
+  for a in range(len(dataset.features)):
+    if training_dataset.features[a] == training_dataset.label_name:
+      training_dataset.label_index = a
+    else:
+      training_dataset.label_index = range(len(training_dataset.features))[-1]
+  for a in range(len(dataset.features)):
+    if test_dataset.features[a] == test_dataset.label_name:
+      test_dataset.label_index = a
+    else:
+      test_dataset.label_index = range(len(test_dataset.features))[-1]
+
+  data_samples = dataset.examples
+
+  random.shuffle(data_samples)
+  
+  max_height = 20
+  root = compute_tree(dataset, None, label_name, max_height, method)
+
+  feature_list = []
+  tree_node_stats(root, feature_list, max_height)
+  feature_list = sorted(feature_list, key=lambda x:x[1])
+
+  return feature_list
 
 def main():
   args = str(sys.argv)
@@ -632,7 +673,8 @@ def main():
   max_height = 10
   method = "IG"
       
-  accuracy, auc, fscore, avg_num_feature, feature_list, _ = Run(args[1], args[2], max_height, method)
+  input_data = pd.read_csv(args[1])
+  accuracy, auc, fscore, avg_num_feature, feature_list, _ = Run(input_data, args[2], max_height, method)
   print accuracy
   print auc
   print fscore
