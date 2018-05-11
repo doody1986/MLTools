@@ -535,10 +535,10 @@ def Run(input_data, label_name, max_height, method):
 
   random.shuffle(data_samples)
   
-  negative_set = filter(lambda x: x[dataset.label_index] == 1, data_samples)
-  positive_set = filter(lambda x: x[dataset.label_index] == 2, data_samples)
-  print "The number of negative sample is: ", len(negative_set)
-  print "The number of positive sample is: ", len(positive_set)
+  negative_samples = filter(lambda x: x[dataset.label_index] == 1, data_samples)
+  positive_samples = filter(lambda x: x[dataset.label_index] == 2, data_samples)
+  print "The number of negative sample is: ", len(negative_samples)
+  print "The number of positive sample is: ", len(positive_samples)
 
   accuracy_list = []
   false_positive_rate_list = []
@@ -555,11 +555,24 @@ def Run(input_data, label_name, max_height, method):
   counts = 0
   feature_list = []
   selected_tree = None
-  for train_idx, test_idx in cv_arg.split(np.array(data_samples)):
+
+  train_idx_positive = []
+  test_idx_positive = []
+  train_idx_negative = []
+  test_idx_negative = []
+  for train_idx, test_idx in cv_arg.split(np.array(positive_samples)):
+    train_idx_positive.append(train_idx)
+    test_idx_positive.append(test_idx)
+  for train_idx, test_idx in cv_arg.split(np.array(negative_samples)):
+    train_idx_negative.append(train_idx)
+    test_idx_negative.append(test_idx)
+  for idx in range(n_folds):
     results = []
     local_feature_list = []
-    training_dataset.examples = [ data_samples[i] for i in train_idx ]
-    test_dataset.examples = [ data_samples[i] for i in test_idx ]
+    training_dataset.examples = [ positive_samples[i] for i in train_idx_positive[idx] ] +\
+                                [ negative_samples[i] for i in train_idx_negative[idx] ]
+    test_dataset.examples = [ positive_samples[i] for i in test_idx_positive[idx] ] +\
+                            [ negative_samples[i] for i in test_idx_negative[idx] ]
     root = compute_tree(training_dataset, None, label_name, max_height, method)
     tree_node_stats(root, local_feature_list, max_height)
     feature_list = feature_list + [i[0] for i in local_feature_list]

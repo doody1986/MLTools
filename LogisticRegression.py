@@ -19,8 +19,8 @@ def Run(data, num_features, label_name, ranking_method):
   features = data.columns.tolist()
   indices = data.index.tolist()
   features.remove(label_name)
-  x = data[features]
-  y = data[label_name].as_matrix()
+  #x = data[features]
+  #y = data[label_name].as_matrix()
 
   n_folds = 10
   accuracy_list = []
@@ -30,15 +30,34 @@ def Run(data, num_features, label_name, ranking_method):
   auc_list = []
   fscore_list = []
   cv_arg = KFold(n_folds, shuffle=True)
+  positive_samples = data[data[label_name]==2]
+  negative_samples = data[data[label_name]==1]
   num_rounds = 0
-  for train_idx, test_idx in cv_arg.split(x.as_matrix()):
+  
+  train_idx_positive = []
+  test_idx_positive = []
+  train_idx_negative = []
+  test_idx_negative = []
+  for train_idx, test_idx in cv_arg.split(positive_samples.as_matrix()):
+    train_idx_positive.append(train_idx)
+    test_idx_positive.append(test_idx)
+  for train_idx, test_idx in cv_arg.split(negative_samples.as_matrix()):
+    train_idx_negative.append(train_idx)
+    test_idx_negative.append(test_idx)
+  for idx in range(n_folds):
     # x is data frame while y is numpy array
     ranked_features = []
     selected_features = []
-    train_set = x.iloc[train_idx]
-    train_label = y[train_idx]
-    test_set = x.iloc[test_idx]
-    ref = y[test_idx]
+    train_set_positive = positive_samples.iloc[train_idx_positive[idx]]
+    train_set_negative = negative_samples.iloc[train_idx_negative[idx]]
+    test_set_positive = positive_samples.iloc[test_idx_positive[idx]]
+    test_set_negative = negative_samples.iloc[test_idx_negative[idx]]
+    train_set = pd.concat([train_set_positive, train_set_negative])
+    test_set = pd.concat([test_set_positive, test_set_negative])
+    train_label = train_set[label_name].as_matrix()
+    ref = test_set[label_name].as_matrix()
+    train_set.drop(label_name, axis=1, inplace=True)
+    test_set.drop(label_name, axis=1, inplace=True)
 
     for f in features:
       data_f = train_set[f].as_matrix()

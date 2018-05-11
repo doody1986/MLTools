@@ -65,7 +65,8 @@ def main():
   auc_var_dt = []
   fscore_var_dt = []
   num_features_list = []
-  for b in range(1, 11):
+  num_heights = range(1, 11)
+  for b in num_heights:
     num_feature_auc = 0
     accuracy_auc, auc_auc, fscore_auc, num_feature_auc, feature_list_auc, _ = dt.Run(data, "PPTERM", b, "AUC")
     num_feature_ig = 0
@@ -160,12 +161,12 @@ def main():
   print df_accuracy
   print df_auc
   print df_fscore
-  df_accuracy.to_csv(current_path+"Results/Accuracy"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
-  df_auc.to_csv(current_path+"Results/AUC"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
-  df_fscore.to_csv(current_path+"Results/Fscore"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
-  df_accuracy_var.to_csv(current_path+"Results/Accuracy_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
-  df_auc_var.to_csv(current_path+"Results/AUC_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
-  df_fscore_var.to_csv(current_path+"Results/Fscore_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_accuracy.to_csv(current_path+"/Results/Accuracy"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_auc.to_csv(current_path+"/Results/AUC"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_fscore.to_csv(current_path+"/Results/Fscore"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_accuracy_var.to_csv(current_path+"/Results/Accuracy_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_auc_var.to_csv(current_path+"/Results/AUC_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_fscore_var.to_csv(current_path+"/Results/Fscore_var"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
 
   num_top_features = 20
   top_feature_linear = [i[0] for i in ranked_feature_linear[:num_top_features]]
@@ -174,7 +175,7 @@ def main():
   top_feature_ig = [i[0] for i in ranked_feature_ig[:num_top_features]]
   df_selected_features = pd.DataFrame({"Linear":top_feature_linear, "NMI":top_feature_nmi, "AUC":top_feature_auc, "IG":top_feature_ig})
   print df_selected_features
-  df_selected_features.to_csv(current_path+"Results/SelectedFeatures"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
+  df_selected_features.to_csv(current_path+"/Results/SelectedFeatures"+"_"+time.strftime("%m%d%Y")+".csv", index=False)
 
   print ("End program.")
   return 0
