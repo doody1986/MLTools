@@ -56,44 +56,39 @@ def main():
   ranked_feature_auc = dt.SelectFeature(data, "PPTERM", "AUC")
   ranked_feature_ig = dt.SelectFeature(data, "PPTERM", "IG")
 
-  feature_list_auc = []
-  feature_list_ig = []
   accuracy_dt = []
   auc_dt = []
   fscore_dt = []
   accuracy_var_dt = []
   auc_var_dt = []
   fscore_var_dt = []
-  num_features_list = []
-  num_heights = range(1, 11)
-  for b in num_heights:
-    num_feature_auc = 0
-    accuracy_auc, auc_auc, fscore_auc, num_feature_auc, feature_list_auc, _ = dt.Run(data, "PPTERM", b, "AUC")
-    num_feature_ig = 0
-    accuracy_ig, auc_ig, fscore_ig, num_feature_ig, feature_list_ig, _ = dt.Run(data, "PPTERM", b, "IG")
+  max_num_features = 20
+  num_features = range(max_num_features)
+  accuracy_auc, auc_auc, fscore_auc = dt.Run(data, "PPTERM", max_num_features, "AUC")
+  accuracy_ig, auc_ig, fscore_ig = dt.Run(data, "PPTERM", max_num_features, "IG")
 
+  for b in num_features:
     # Calculate the mean and variance
-    accuracy_auc_mean = np.mean(np.array(accuracy_auc))
-    accuracy_auc_var = np.var(np.array(accuracy_auc))
-    auc_auc_mean = np.mean(np.array(auc_auc))
-    auc_auc_var = np.var(np.array(auc_auc))
-    fscore_auc_mean = np.mean(np.array(fscore_auc))
-    fscore_auc_var = np.var(np.array(fscore_auc))
-    accuracy_ig_mean = np.mean(np.array(accuracy_ig))
-    accuracy_ig_var = np.var(np.array(accuracy_ig))
-    auc_ig_mean = np.mean(np.array(auc_ig))
-    auc_ig_var = np.var(np.array(auc_ig))
-    fscore_ig_mean = np.mean(np.array(fscore_ig))
-    fscore_ig_var = np.var(np.array(fscore_ig))
+    accuracy_auc_mean = np.mean(np.array(accuracy_auc)[:, b])
+    accuracy_auc_var = np.var(np.array(accuracy_auc)[:, b])
+    auc_auc_mean = np.mean(np.array(auc_auc)[:, b])
+    auc_auc_var = np.var(np.array(auc_auc)[:, b])
+    fscore_auc_mean = np.mean(np.array(fscore_auc)[:, b])
+    fscore_auc_var = np.var(np.array(fscore_auc)[:, b])
+    accuracy_ig_mean = np.mean(np.array(accuracy_ig)[:, b])
+    accuracy_ig_var = np.var(np.array(accuracy_ig)[:, b])
+    auc_ig_mean = np.mean(np.array(auc_ig)[:, b])
+    auc_ig_var = np.var(np.array(auc_ig)[:, b])
+    fscore_ig_mean = np.mean(np.array(fscore_ig)[:, b])
+    fscore_ig_var = np.var(np.array(fscore_ig)[:, b])
 
     # create the list for generating the table
-    accuracy_dt.append([b, accuracy_auc_mean, accuracy_ig_mean])
-    auc_dt.append([b, auc_auc_mean, auc_ig_mean])
-    fscore_dt.append([b, fscore_auc_mean, fscore_ig_mean])
-    accuracy_var_dt.append([b, accuracy_auc_var, accuracy_ig_var])
-    auc_var_dt.append([b, auc_auc_var, auc_ig_var])
-    fscore_var_dt.append([b, fscore_auc_var, fscore_ig_var])
-    num_features_list.append(int(max(num_feature_auc, num_feature_ig)))
+    accuracy_dt.append([b+1, accuracy_auc_mean, accuracy_ig_mean])
+    auc_dt.append([b+1, auc_auc_mean, auc_ig_mean])
+    fscore_dt.append([b+1, fscore_auc_mean, fscore_ig_mean])
+    accuracy_var_dt.append([b+1, accuracy_auc_var, accuracy_ig_var])
+    auc_var_dt.append([b+1, auc_auc_var, auc_ig_var])
+    fscore_var_dt.append([b+1, fscore_auc_var, fscore_ig_var])
 
   df_accuracy_dt = pd.DataFrame(accuracy_dt, columns=["N", "DT_AUC", "DT_IG"])
   df_auc_dt = pd.DataFrame(auc_dt, columns=["N", "DT_AUC", "DT_IG"])
@@ -101,12 +96,7 @@ def main():
   df_accuracy_var_dt = pd.DataFrame(accuracy_var_dt, columns=["N", "DT_AUC", "DT_IG"])
   df_auc_var_dt = pd.DataFrame(auc_var_dt, columns=["N", "DT_AUC", "DT_IG"])
   df_fscore_var_dt = pd.DataFrame(fscore_var_dt, columns=["N", "DT_AUC", "DT_IG"])
-
-  # Is this fair?
-  #ranked_feature_auc = collections.Counter(feature_list_auc).most_common()
-  #ranked_feature_ig = collections.Counter(feature_list_ig).most_common()
-
-  print "Number of features: ", num_features_list
+  exit()
 
   accuracy_lr = []
   auc_lr = []
@@ -115,8 +105,6 @@ def main():
   auc_var_lr = []
   fscore_var_lr = []
   for a in range(1, 11):
-
-    num = num_features_list[a-1]
 
     accuracy_linear, auc_linear, fscore_linear = lr.Run(data, num, "PPTERM", "Linear")
 

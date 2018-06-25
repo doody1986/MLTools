@@ -58,6 +58,7 @@ class treeNode():
     self.num_pos = 0
     self.num_neg = 0
     self.metric = 0
+    self.id = 0
 
 ##################################################
 # compute tree recursively
@@ -359,17 +360,55 @@ def validate_example(node, example):
   else:
     return validate_example(node.lower_child, example)
 
+
+# Function to mark the id using breath first traversal of tree
+def mark_tree(root):
+  h = height(root)
+  for i in range(1, h+1):
+    mark_given_level(root, i)
+ 
+global_id = 0
+# Print nodes at a given level
+def mark_given_level(root, level):
+  if root is None:
+    return
+  if level == 1:
+    global global_id
+    root.id = global_id 
+    global_id += 1
+  elif level > 1 :
+    if root.lower_child != None and root.upper_child != None and root.lower_child.metric > root.upper_child.metric:
+      mark_given_level(root.lower_child, level-1)
+      mark_given_level(root.upper_child, level-1)
+    else:
+      mark_given_level(root.upper_child, level-1)
+      mark_given_level(root.lower_child, level-1)
+ 
+def height(node):
+  if node is None:
+    return 0
+  else :
+    # Compute the height of each subtree 
+    lheight = height(node.lower_child)
+    rheight = height(node.upper_child)
+
+    #Use the larger one
+    if lheight > rheight :
+      return lheight+1
+    else:
+      return rheight+1
 ##################################################
 # Test example
 ##################################################
-def test_example(example, node):
-  if (node.is_leaf == True):
+# lower is left and upper is right
+def test_example(example, node, max_num_features):
+  if (node.is_leaf == True or node.id > max_num_features):
     return node.classification
   else:
     if (example[node.feat_split_index] >= node.feat_split_value):
-      return test_example(example, node.upper_child)
+      return test_example(example, node.upper_child, max_num_features)
     else:
-      return test_example(example, node.lower_child)
+      return test_example(example, node.lower_child, max_num_features)
 
 ##################################################
 # Print tree
@@ -495,7 +534,7 @@ def prune_tree_graph(graph, node, graph_node, edge_label, max_height):
 # need to account for missing data
 ##################################################
 
-def Run(input_data, label_name, max_height, method):
+def Run(input_data, label_name, num_features, method):
 
   dataset = data("")
   datatypes = None
@@ -546,15 +585,14 @@ def Run(input_data, label_name, max_height, method):
   true_positive_rate_list = []
   auc_list = []
   fscore_list = []
-  ref_false_negative_rate = 1.0
+  #ref_false_negative_rate = 1.0
   # Start 10-fold cross validation
   n_folds = 10
   cv_arg = KFold(n_folds, shuffle=True)
   root = None
-  avg_num_feature = 0
-  counts = 0
-  feature_list = []
-  selected_tree = None
+  #avg_num_feature = 0
+  #feature_list = []
+  #selected_tree = None
 
   train_idx_positive = []
   test_idx_positive = []
@@ -566,63 +604,80 @@ def Run(input_data, label_name, max_height, method):
   for train_idx, test_idx in cv_arg.split(np.array(negative_samples)):
     train_idx_negative.append(train_idx)
     test_idx_negative.append(test_idx)
+
+  
   for idx in range(n_folds):
-    results = []
-    local_feature_list = []
     training_dataset.examples = [ positive_samples[i] for i in train_idx_positive[idx] ] +\
                                 [ negative_samples[i] for i in train_idx_negative[idx] ]
     test_dataset.examples = [ positive_samples[i] for i in test_idx_positive[idx] ] +\
                             [ negative_samples[i] for i in test_idx_negative[idx] ]
-    root = compute_tree(training_dataset, None, label_name, max_height, method)
-    tree_node_stats(root, local_feature_list, max_height)
-    feature_list = feature_list + [i[0] for i in local_feature_list]
-    avg_num_feature += len(Counter(local_feature_list))
-    for example in test_dataset.examples:
-      results.append(test_example(example, root))
+    root = compute_tree(training_dataset, None, label_name, 20, method)
+
+    # Only output accuracy auc and fscore for selected number of features
+    #tree_node_stats(root, local_feature_list, max_height)
+    #feature_list = feature_list + [i[0] for i in local_feature_list]
+    #avg_num_feature += len(Counter(local_feature_list))
+
+    mark_tree(root)
     ref = [example[test_dataset.label_index] for example in test_dataset.examples]
-    accurate_count = 0
-    false_negative_count = 0
-    false_positive_count = 0
-    true_positive_count = 0
-    preterm_count = 0
-    term_count = 0
-    for i in range(len(results)):
-      if results[i] == ref[i]:
-        accurate_count += 1
-      if ref[i] == 2:
-        preterm_count += 1
-      if ref[i] == 1:
-        term_count += 1
-      # False negative
-      if ref[i] == 2 and results[i] == 1:
-        false_negative_count += 1
-      # False positive
-      if ref[i] == 1 and results[i] == 2:
-        false_positive_count += 1
-      # True positive
-      if ref[i] == 2 and results[i] == 2:
-        true_positive_count += 1
-    if preterm_count == 0:
-      continue
-    counts += 1
-    accuracy = float(accurate_count) / float(len(results))
-    false_negative_rate = float(false_negative_count) / float(preterm_count)
-    false_positive_rate = float(false_positive_count) / float(term_count)
-    true_positive_rate = float(true_positive_count) / float(preterm_count)
-    if (float(false_negative_count) / float(preterm_count)) < ref_false_negative_rate:
-      selected_tree = root
-      ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
+    local_accuracy_list = []
+    local_false_positive_rate_list = []
+    local_false_negative_rate_list = []
+    local_true_positive_rate_list = []
+    local_auc_list = []
+    local_fscore_list = []
+    for n_feat in range(1, num_features+1):
+      results = []
+      for example in test_dataset.examples:
+        results.append(test_example(example, root, n_feat))
+      accurate_count = 0
+      false_negative_count = 0
+      false_positive_count = 0
+      true_positive_count = 0
+      auc = 0
+      fscore = 0
+      preterm_count = 0
+      term_count = 0
+      for i in range(len(results)):
+        if results[i] == ref[i]:
+          accurate_count += 1
+        if ref[i] == 2:
+          preterm_count += 1
+        if ref[i] == 1:
+          term_count += 1
+        # False negative
+        if ref[i] == 2 and results[i] == 1:
+          false_negative_count += 1
+        # False positive
+        if ref[i] == 1 and results[i] == 2:
+          false_positive_count += 1
+        # True positive
+        if ref[i] == 2 and results[i] == 2:
+          true_positive_count += 1
+      accuracy = float(accurate_count) / float(len(results))
+      false_negative_rate = float(false_negative_count) / float(preterm_count)
+      false_positive_rate = float(false_positive_count) / float(term_count)
+      true_positive_rate = float(true_positive_count) / float(preterm_count)
+      auc = metrics.auc([0.0, false_positive_rate, 1.0], [0.0, true_positive_rate, 1.0])
+      fscore = metrics.fbeta_score(ref, results, 2)
+      local_accuracy_list.append(accuracy)
+      local_false_negative_rate_list.append(false_negative_rate)
+      local_false_positive_rate_list.append(false_positive_rate)
+      local_true_positive_rate_list.append(true_positive_rate)
+      local_auc_list.append(auc)
+      local_fscore_list.append(fscore)
+      #if (float(false_negative_count) / float(preterm_count)) < ref_false_negative_rate:
+      #  selected_tree = root
+      #  ref_false_negative_rate = float(false_negative_count) / float(preterm_count)
 
-    accuracy_list.append(accuracy)
-    false_negative_rate_list.append(false_negative_rate)
-    false_positive_rate_list.append(false_positive_rate)
-    true_positive_rate_list.append(true_positive_rate)
-    auc_list.append(metrics.auc([0.0, false_positive_rate, 1.0], [0.0, true_positive_rate, 1.0]))
-    fscore_list.append(metrics.fbeta_score(ref, results, 2))
+    accuracy_list.append(local_accuracy_list)
+    false_negative_rate_list.append(local_false_negative_rate_list)
+    false_positive_rate_list.append(local_false_positive_rate_list)
+    true_positive_rate_list.append(local_true_positive_rate_list)
+    auc_list.append(local_auc_list)
+    fscore_list.append(local_fscore_list)
 
-  avg_num_feature = round(float(avg_num_feature) / float(counts))
-
-  return (accuracy_list, auc_list, fscore_list, avg_num_feature, feature_list, selected_tree)
+  return (accuracy_list, auc_list, fscore_list)
 
 def SelectFeature(input_data, label_name, method):
 
@@ -687,13 +742,13 @@ def main():
   method = "IG"
       
   input_data = pd.read_csv(args[1])
-  accuracy, auc, fscore, avg_num_feature, feature_list, _ = Run(input_data, args[2], max_height, method)
+  accuracy, auc, fscore = Run(input_data, args[2], max_height, method)
   print accuracy
   print auc
   print fscore
 
-  counter_dict = Counter(feature_list)
-  print counter_dict
+  #counter_dict = Counter(feature_list)
+  #print counter_dict
   exit()
   counter_list = []
   key_list = []

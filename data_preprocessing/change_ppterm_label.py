@@ -31,6 +31,17 @@ def UpdateLabel(data_file):
         print "StudyID:", data.loc[idx[0], 'STUDY_ID'], "Original label:", original_value, "Updated label:", updated_value
   return data
 
+def CleanStudyID(data_file):
+  data = pd.read_csv(data_file)
+  final_studyid_list = [i[0] for i in label_list]
+  studyid_list = data['STUDY_ID'].tolist()
+  for studyid in studyid_list:
+    if studyid not in final_studyid_list:
+      idx = data.index[data['STUDY_ID'] == studyid].tolist()
+      print "Weird study ID:", studyid
+      data = data.drop(idx[0])
+  return data
+
 def main():
   print ("Start program.")
 
@@ -49,10 +60,12 @@ def main():
   ObtainLabel(updated_label_file_name)
 
   for file_name in arg_list:
-    data = UpdateLabel(file_name)
-    print file_name, "updated done"
+    #data = UpdateLabel(file_name)
+    #print file_name, "updated done"
+    data = CleanStudyID(file_name)
 
-    data.to_csv("updated_"+file_name, index=False)
+    #data.to_csv("updated_"+file_name, index=False)
+    data.to_csv(file_name, index=False)
 
   print ("End program.")
   return 0

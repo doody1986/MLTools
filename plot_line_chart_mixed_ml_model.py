@@ -53,8 +53,8 @@ def Plot(name, ylim, x,
 def main():
 
   current_path = os.getcwd()
-  df_accuracy = pd.read_csv(current_path+"/Results/Accuracy_04122018.csv")
-  df_accuracy_var = pd.read_csv(current_path+"/Results/Accuracy_var_04122018.csv")
+  df_accuracy = pd.read_csv(current_path+"/Results/Accuracy_05032018.csv")
+  df_accuracy_var = pd.read_csv(current_path+"/Results/Accuracy_var_05032018.csv")
   x = df_accuracy["N"].as_matrix()
   name = "Accuracy"
   auc_mean = df_accuracy["DT_AUC"].as_matrix()
@@ -71,8 +71,8 @@ def main():
        linear_mean, linear_var,
        nmi_mean, nmi_var)
 
-  df_auc = pd.read_csv(current_path+"/Results/AUC_04122018.csv")
-  df_auc_var = pd.read_csv(current_path+"/Results/AUC_var_04122018.csv")
+  df_auc = pd.read_csv(current_path+"/Results/AUC_05032018.csv")
+  df_auc_var = pd.read_csv(current_path+"/Results/AUC_var_05032018.csv")
   x = df_auc["N"].as_matrix()
   name = "AUC"
   auc_mean = df_auc["DT_AUC"].as_matrix()
@@ -89,8 +89,8 @@ def main():
        linear_mean, linear_var,
        nmi_mean, nmi_var)
 
-  df_fscore = pd.read_csv(current_path+"/Results/Fscore_04122018.csv")
-  df_fscore_var = pd.read_csv(current_path+"/Results/Fscore_var_04122018.csv")
+  df_fscore = pd.read_csv(current_path+"/Results/Fscore_05032018.csv")
+  df_fscore_var = pd.read_csv(current_path+"/Results/Fscore_var_05032018.csv")
   x = df_fscore["N"].as_matrix()
   name = "Fscore"
   fscore_mean = df_fscore["DT_AUC"].as_matrix()
