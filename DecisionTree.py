@@ -361,13 +361,15 @@ def validate_example(node, example):
     return validate_example(node.lower_child, example)
 
 
+global_id = 0
 # Function to mark the id using breath first traversal of tree
 def mark_tree(root):
   h = height(root)
   for i in range(1, h+1):
     mark_given_level(root, i)
+  global global_id
+  global_id = 0
  
-global_id = 0
 # Print nodes at a given level
 def mark_given_level(root, level):
   if root is None:
@@ -376,13 +378,31 @@ def mark_given_level(root, level):
     global global_id
     root.id = global_id 
     global_id += 1
-  elif level > 1 :
+  elif level > 1:
     if root.lower_child != None and root.upper_child != None and root.lower_child.metric > root.upper_child.metric:
       mark_given_level(root.lower_child, level-1)
       mark_given_level(root.upper_child, level-1)
     else:
       mark_given_level(root.upper_child, level-1)
       mark_given_level(root.lower_child, level-1)
+
+def traverse_tree(root):
+  h = height(root)
+  for i in range(1, h+1):
+    print_given_level(root, i)
+
+def print_given_level(root, level):
+  if root is None:
+    return
+  if level == 1:
+    print root.id
+  elif level > 1:
+    if root.lower_child != None and root.upper_child != None and root.lower_child.metric > root.upper_child.metric:
+      print_given_level(root.lower_child, level-1)
+      print_given_level(root.upper_child, level-1)
+    else:
+      print_given_level(root.upper_child, level-1)
+      print_given_level(root.lower_child, level-1)
  
 def height(node):
   if node is None:
@@ -401,14 +421,23 @@ def height(node):
 # Test example
 ##################################################
 # lower is left and upper is right
-def test_example(example, node, max_num_features):
-  if (node.is_leaf == True or node.id > max_num_features):
+def test_example_new(example, node, max_num_features):
+  if node.is_leaf == True or node.id > max_num_features:
     return node.classification
   else:
-    if (example[node.feat_split_index] >= node.feat_split_value):
-      return test_example(example, node.upper_child, max_num_features)
+    if example[node.feat_split_index] >= node.feat_split_value:
+      return test_example_new(example, node.upper_child, max_num_features)
     else:
-      return test_example(example, node.lower_child, max_num_features)
+      return test_example_new(example, node.lower_child, max_num_features)
+
+def test_example(example, node):
+  if node.is_leaf == True:
+    return node.classification
+  else:
+    if example[node.feat_split_index] >= node.feat_split_value:
+      return test_example(example, node.upper_child)
+    else:
+      return test_example(example, node.lower_child)
 
 ##################################################
 # Print tree
@@ -571,7 +600,6 @@ def Run(input_data, label_name, num_features, method):
       test_dataset.label_index = range(len(test_dataset.features))[-1]
 
   data_samples = dataset.examples
-
   random.shuffle(data_samples)
   
   negative_samples = filter(lambda x: x[dataset.label_index] == 1, data_samples)
@@ -605,12 +633,14 @@ def Run(input_data, label_name, num_features, method):
     train_idx_negative.append(train_idx)
     test_idx_negative.append(test_idx)
 
-  
   for idx in range(n_folds):
     training_dataset.examples = [ positive_samples[i] for i in train_idx_positive[idx] ] +\
                                 [ negative_samples[i] for i in train_idx_negative[idx] ]
     test_dataset.examples = [ positive_samples[i] for i in test_idx_positive[idx] ] +\
                             [ negative_samples[i] for i in test_idx_negative[idx] ]
+    random.shuffle(training_dataset.examples)
+    random.shuffle(test_dataset.examples)
+    root = None
     root = compute_tree(training_dataset, None, label_name, 20, method)
 
     # Only output accuracy auc and fscore for selected number of features
@@ -626,10 +656,12 @@ def Run(input_data, label_name, num_features, method):
     local_true_positive_rate_list = []
     local_auc_list = []
     local_fscore_list = []
-    for n_feat in range(1, num_features+1):
+    
+    list_feat_number = range(1, num_features+1)
+    for n_feat in list_feat_number:
       results = []
       for example in test_dataset.examples:
-        results.append(test_example(example, root, n_feat))
+        results.append(test_example_new(example, root, n_feat))
       accurate_count = 0
       false_negative_count = 0
       false_positive_count = 0
@@ -738,11 +770,11 @@ def main():
     print "Your training file (second argument) must be a .csv!"
     exit()
 
-  max_height = 10
-  method = "IG"
+  num_features = 20
+  method = "AUC"
       
   input_data = pd.read_csv(args[1])
-  accuracy, auc, fscore = Run(input_data, args[2], max_height, method)
+  accuracy, auc, fscore = Run(input_data, args[2], num_features, method)
   print accuracy
   print auc
   print fscore
