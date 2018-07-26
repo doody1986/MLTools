@@ -31,6 +31,8 @@ def main():
   data = pd.read_csv(file_name)
 
   max_num_features = 20
+  num_features = range(1, max_num_features+1)
+
   # Get Label
   label = np.array(data['PPTERM'])
   #data.drop('PPTERM', axis=1, inplace=True)
@@ -63,7 +65,6 @@ def main():
   accuracy_var_dt = []
   auc_var_dt = []
   fscore_var_dt = []
-  num_features = range(max_num_features)
   accuracy_auc, _, _, auc_auc, fscore_auc = dt.Run(data, "PPTERM", max_num_features, "AUC")
   accuracy_ig, _, _, auc_ig, fscore_ig = dt.Run(data, "PPTERM", max_num_features, "IG")
 
