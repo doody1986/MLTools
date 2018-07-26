@@ -460,15 +460,13 @@ def print_tree(node):
 ##################################################
 # Tree node stats
 ##################################################
-def tree_node_stats(node, feature_list, max_height):
-  if node.is_leaf == True:
-    return
-  if node.height == max_height:
+def tree_node_stats(node, feature_list, num_features):
+  if node.is_leaf == True or node.id > num_features:
     return
   else:
-    feature_list.append((node.feat_split, node.height))
-    tree_node_stats(node.upper_child, feature_list, max_height)
-    tree_node_stats(node.lower_child, feature_list, max_height)
+    feature_list.append((node.feat_split, node.id))
+    tree_node_stats(node.upper_child, feature_list, num_features)
+    tree_node_stats(node.lower_child, feature_list, num_features)
     return
 
 ##################################################
@@ -643,11 +641,6 @@ def Run(input_data, label_name, num_features, method):
     root = None
     root = compute_tree(training_dataset, None, label_name, 20, method)
 
-    # Only output accuracy auc and fscore for selected number of features
-    #tree_node_stats(root, local_feature_list, max_height)
-    #feature_list = feature_list + [i[0] for i in local_feature_list]
-    #avg_num_feature += len(Counter(local_feature_list))
-
     mark_tree(root)
     ref = [example[test_dataset.label_index] for example in test_dataset.examples]
     local_accuracy_list = []
@@ -709,18 +702,13 @@ def Run(input_data, label_name, num_features, method):
     auc_list.append(local_auc_list)
     fscore_list.append(local_fscore_list)
 
-  return (accuracy_list, auc_list, fscore_list)
+  return (accuracy_list, false_negative_rate_list, false_positive_rate_list, auc_list, fscore_list)
 
 def SelectFeature(input_data, label_name, method):
 
   dataset = data("")
   datatypes = None
   read_data(dataset, input_data, datatypes)
-  arg3 = label_name
-  if (arg3 in dataset.features):
-    label_name = arg3
-  else:
-    label_name = dataset.features[-1]
 
   dataset.label_name = label_name
 
@@ -731,31 +719,14 @@ def SelectFeature(input_data, label_name, method):
     else:
       dataset.label_index = range(len(dataset.features))[-1]
       
-  # Split the data set into training and test set
-  training_dataset = data(label_name)
-  test_dataset = data(label_name)
-  training_dataset.features = dataset.features
-  test_dataset.features = dataset.features
-  for a in range(len(dataset.features)):
-    if training_dataset.features[a] == training_dataset.label_name:
-      training_dataset.label_index = a
-    else:
-      training_dataset.label_index = range(len(training_dataset.features))[-1]
-  for a in range(len(dataset.features)):
-    if test_dataset.features[a] == test_dataset.label_name:
-      test_dataset.label_index = a
-    else:
-      test_dataset.label_index = range(len(test_dataset.features))[-1]
-
-  data_samples = dataset.examples
-
-  random.shuffle(data_samples)
+  random.shuffle(dataset.examples)
   
   max_height = 20
   root = compute_tree(dataset, None, label_name, max_height, method)
+  mark_tree(root)
 
   feature_list = []
-  tree_node_stats(root, feature_list, max_height)
+  tree_node_stats(root, feature_list, num_features)
   feature_list = sorted(feature_list, key=lambda x:x[1])
 
   return feature_list
@@ -774,7 +745,7 @@ def main():
   method = "AUC"
       
   input_data = pd.read_csv(args[1])
-  accuracy, auc, fscore = Run(input_data, args[2], num_features, method)
+  accuracy, fnr, fpr, auc, fscore = Run(input_data, args[2], num_features, method)
   print accuracy
   print auc
   print fscore
