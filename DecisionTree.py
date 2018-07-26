@@ -704,7 +704,7 @@ def Run(input_data, label_name, num_features, method):
 
   return (accuracy_list, false_negative_rate_list, false_positive_rate_list, auc_list, fscore_list)
 
-def SelectFeature(input_data, label_name, method):
+def SelectFeature(input_data, label_name, method, num_features):
 
   dataset = data("")
   datatypes = None
