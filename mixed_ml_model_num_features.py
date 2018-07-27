@@ -31,7 +31,7 @@ def main():
   data = pd.read_csv(file_name)
 
   max_num_features = 20
-  num_features = range(1, max_num_features+1)
+  num_features = range(max_num_features)
 
   # Get Label
   label = np.array(data['PPTERM'])
@@ -106,7 +106,7 @@ def main():
   fscore_var_lr = []
   for a in num_features:
 
-    accuracy_linear, auc_linear, fscore_linear = lr.Run(data, a, "PPTERM", "Linear")
+    accuracy_linear, auc_linear, fscore_linear = lr.Run(data, a+1, "PPTERM", "Linear")
 
     # Calculate the mean and variance for linear correlation
     accuracy_linear_mean = np.mean(np.array(accuracy_linear))
@@ -116,7 +116,7 @@ def main():
     fscore_linear_mean = np.mean(np.array(fscore_linear))
     fscore_linear_var = np.var(np.array(fscore_linear))
 
-    accuracy_nmi, auc_nmi, fscore_nmi = lr.Run(data, a, "PPTERM", "NMI")
+    accuracy_nmi, auc_nmi, fscore_nmi = lr.Run(data, a+1, "PPTERM", "NMI")
 
     # Calculate the mean and variance for nmi
     accuracy_nmi_mean = np.mean(np.array(accuracy_nmi))
