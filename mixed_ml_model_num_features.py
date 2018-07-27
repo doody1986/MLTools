@@ -30,7 +30,7 @@ def main():
 
   data = pd.read_csv(file_name)
 
-  max_num_features = 100
+  max_num_features = 50
   num_features = range(10, max_num_features, 10)
 
   # Get Label
@@ -68,28 +68,29 @@ def main():
   accuracy_auc, _, _, auc_auc, fscore_auc = dt.Run(data, "PPTERM", max_num_features, "AUC")
   accuracy_ig, _, _, auc_ig, fscore_ig = dt.Run(data, "PPTERM", max_num_features, "IG")
 
-  for b in num_features:
+  indices = range(1, len(num_features)+1)
+  for i, b in zip(indices, num_features):
     # Calculate the mean and variance
-    accuracy_auc_mean = np.mean(np.array(accuracy_auc)[:, b])
-    accuracy_auc_var = np.var(np.array(accuracy_auc)[:, b])
-    auc_auc_mean = np.mean(np.array(auc_auc)[:, b])
-    auc_auc_var = np.var(np.array(auc_auc)[:, b])
-    fscore_auc_mean = np.mean(np.array(fscore_auc)[:, b])
-    fscore_auc_var = np.var(np.array(fscore_auc)[:, b])
-    accuracy_ig_mean = np.mean(np.array(accuracy_ig)[:, b])
-    accuracy_ig_var = np.var(np.array(accuracy_ig)[:, b])
-    auc_ig_mean = np.mean(np.array(auc_ig)[:, b])
-    auc_ig_var = np.var(np.array(auc_ig)[:, b])
-    fscore_ig_mean = np.mean(np.array(fscore_ig)[:, b])
-    fscore_ig_var = np.var(np.array(fscore_ig)[:, b])
+    accuracy_auc_mean = np.mean(np.array(accuracy_auc)[:, i])
+    accuracy_auc_var = np.var(np.array(accuracy_auc)[:, i])
+    auc_auc_mean = np.mean(np.array(auc_auc)[:, i])
+    auc_auc_var = np.var(np.array(auc_auc)[:, i])
+    fscore_auc_mean = np.mean(np.array(fscore_auc)[:, i])
+    fscore_auc_var = np.var(np.array(fscore_auc)[:, i])
+    accuracy_ig_mean = np.mean(np.array(accuracy_ig)[:, i])
+    accuracy_ig_var = np.var(np.array(accuracy_ig)[:, i])
+    auc_ig_mean = np.mean(np.array(auc_ig)[:, i])
+    auc_ig_var = np.var(np.array(auc_ig)[:, i])
+    fscore_ig_mean = np.mean(np.array(fscore_ig)[:, i])
+    fscore_ig_var = np.var(np.array(fscore_ig)[:, i])
 
     # create the list for generating the table
-    accuracy_dt.append([b+1, accuracy_auc_mean, accuracy_ig_mean])
-    auc_dt.append([b+1, auc_auc_mean, auc_ig_mean])
-    fscore_dt.append([b+1, fscore_auc_mean, fscore_ig_mean])
-    accuracy_var_dt.append([b+1, accuracy_auc_var, accuracy_ig_var])
-    auc_var_dt.append([b+1, auc_auc_var, auc_ig_var])
-    fscore_var_dt.append([b+1, fscore_auc_var, fscore_ig_var])
+    accuracy_dt.append([b, accuracy_auc_mean, accuracy_ig_mean])
+    auc_dt.append([b, auc_auc_mean, auc_ig_mean])
+    fscore_dt.append([b, fscore_auc_mean, fscore_ig_mean])
+    accuracy_var_dt.append([b, accuracy_auc_var, accuracy_ig_var])
+    auc_var_dt.append([b, auc_auc_var, auc_ig_var])
+    fscore_var_dt.append([b, fscore_auc_var, fscore_ig_var])
 
   df_accuracy_dt = pd.DataFrame(accuracy_dt, columns=["N", "DT_AUC", "DT_IG"])
   df_auc_dt = pd.DataFrame(auc_dt, columns=["N", "DT_AUC", "DT_IG"])
@@ -106,7 +107,7 @@ def main():
   fscore_var_lr = []
   for a in num_features:
 
-    accuracy_linear, auc_linear, fscore_linear = lr.Run(data, a+1, "PPTERM", "Linear")
+    accuracy_linear, auc_linear, fscore_linear = lr.Run(data, a, "PPTERM", "Linear")
 
     # Calculate the mean and variance for linear correlation
     accuracy_linear_mean = np.mean(np.array(accuracy_linear))
@@ -116,7 +117,7 @@ def main():
     fscore_linear_mean = np.mean(np.array(fscore_linear))
     fscore_linear_var = np.var(np.array(fscore_linear))
 
-    accuracy_nmi, auc_nmi, fscore_nmi = lr.Run(data, a+1, "PPTERM", "NMI")
+    accuracy_nmi, auc_nmi, fscore_nmi = lr.Run(data, a, "PPTERM", "NMI")
 
     # Calculate the mean and variance for nmi
     accuracy_nmi_mean = np.mean(np.array(accuracy_nmi))
@@ -126,12 +127,12 @@ def main():
     fscore_nmi_mean = np.mean(np.array(fscore_nmi))
     fscore_nmi_var = np.var(np.array(fscore_nmi))
 
-    accuracy_lr.append([a+1, accuracy_linear_mean, accuracy_nmi_mean])
-    auc_lr.append([a+1, auc_linear_mean, auc_nmi_mean])
-    fscore_lr.append([a+1, fscore_linear_mean, fscore_nmi_mean])
-    accuracy_var_lr.append([a+1, accuracy_linear_var, accuracy_nmi_var])
-    auc_var_lr.append([a+1, auc_linear_var, auc_nmi_var])
-    fscore_var_lr.append([a+1, fscore_linear_var, fscore_nmi_var])
+    accuracy_lr.append([a, accuracy_linear_mean, accuracy_nmi_mean])
+    auc_lr.append([a, auc_linear_mean, auc_nmi_mean])
+    fscore_lr.append([a, fscore_linear_mean, fscore_nmi_mean])
+    accuracy_var_lr.append([a, accuracy_linear_var, accuracy_nmi_var])
+    auc_var_lr.append([a, auc_linear_var, auc_nmi_var])
+    fscore_var_lr.append([a, fscore_linear_var, fscore_nmi_var])
 
   df_accuracy_lr = pd.DataFrame(accuracy_lr, columns=["N", "Linear", "NMI"])
   df_auc_lr = pd.DataFrame(auc_lr, columns=["N", "Linear", "NMI"])
