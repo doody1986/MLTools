@@ -68,7 +68,7 @@ def main():
   accuracy_auc, _, _, auc_auc, fscore_auc = dt.Run(data, "PPTERM", max_num_features, "AUC")
   accuracy_ig, _, _, auc_ig, fscore_ig = dt.Run(data, "PPTERM", max_num_features, "IG")
 
-  indices = range(1, len(num_features)+1)
+  indices = range(len(num_features))
   for i, b in zip(indices, num_features):
     # Calculate the mean and variance
     accuracy_auc_mean = np.mean(np.array(accuracy_auc)[:, i])
