@@ -650,7 +650,7 @@ def Run(input_data, label_name, num_features, method):
     local_auc_list = []
     local_fscore_list = []
     
-    list_feat_number = range(1, num_features+1)
+    list_feat_number = range(10, num_features, 10)
     for n_feat in list_feat_number:
       results = []
       for example in test_dataset.examples:
