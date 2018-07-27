@@ -31,7 +31,7 @@ def main():
   data = pd.read_csv(file_name)
 
   max_num_features = 50
-  num_features = range(10, max_num_features, 10)
+  num_features = range(10, max_num_features+10, 10)
 
   # Get Label
   label = np.array(data['PPTERM'])

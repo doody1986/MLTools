@@ -561,7 +561,7 @@ def prune_tree_graph(graph, node, graph_node, edge_label, max_height):
 # need to account for missing data
 ##################################################
 
-def Run(input_data, label_name, num_features, method):
+def Run(input_data, label_name, max_num_features, method):
 
   dataset = data("")
   datatypes = None
@@ -650,7 +650,9 @@ def Run(input_data, label_name, num_features, method):
     local_auc_list = []
     local_fscore_list = []
     
-    list_feat_number = range(10, num_features, 10)
+    initial_num_features = 10
+    num_features_step = 10
+    list_feat_number = range(initial_num_features, max_num_features+num_features_step, num_features_step)
     for n_feat in list_feat_number:
       results = []
       for example in test_dataset.examples:
