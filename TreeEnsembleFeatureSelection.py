@@ -244,9 +244,10 @@ def main():
     exit()
 
   input_data = pd.read_csv(args[1])
-  method = "CAA"
+  method = args[4]
+  num_selected_feats = args[5]
   print "The feature selection method is: ", method
-  final_feature_list = Run(input_data, args[2], int(args[3]), method, 20)
+  final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats))
   print final_feature_list
 
 
