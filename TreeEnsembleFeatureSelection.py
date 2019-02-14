@@ -188,6 +188,7 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
   # Ensemble
   final_feature_list = []
   final_feature_rank = np.zeros(num_feats)
+  feature_accuracy_dict = collections.OrderedDict()
   ref = [example[test_dataset.label_index] for example in test_dataset.examples]
   for num in range(num_ensemble):
     new_train_idx_neg = np.random.choice(num_neg_training, num_pos_training, replace=False).tolist()
@@ -209,8 +210,16 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
       # Complete linear aggregation
       final_feature_rank += ranks
     if method == "WMA":
-      # 
+      # Weighted mean aggregation
       final_feature_rank += ranks * (1 - auc)
+    if method == "CAA":
+      # Classification accuracy aggregation
+      feat_idx = extract_selected_feat_idx(ranks, num_selected_feats)
+      for idx in feat_idx:
+        if features[idx] not in feature_accuracy_dict:
+          feature_accuracy_dict[features[idx]] = 0
+        feature_accuracy_dict[features[idx]] = feature_accuracy_dict[features[idx]] + accuracy
+      
   
   if method == "OFA":
     counter_dict = Counter(final_feature_list)
@@ -218,6 +227,8 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
   if method == "CLA" or  method == "WMA":
     feat_idx = extract_selected_feat_idx(final_feature_rank, num_selected_feats)
     final_feature_list = [features[i] for i in feat_idx]
+  if method == "CAA":
+    final_feature_list = sorted(feature_accuracy_dict, key=feature_accuracy_dict.get, reverse=True)
 
   return final_feature_list[:num_selected_feats]
 
@@ -233,7 +244,7 @@ def main():
     exit()
 
   input_data = pd.read_csv(args[1])
-  method = "WMA"
+  method = "CAA"
   print "The feature selection method is: ", method
   final_feature_list = Run(input_data, args[2], int(args[3]), method, 20)
   print final_feature_list
