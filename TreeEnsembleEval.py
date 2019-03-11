@@ -62,7 +62,7 @@ def validate_tree(dataset):
 # need to account for missing data
 ##################################################
 
-def Run(input_data, label_name, num_boost):
+def Run(input_data, label_name, num_ensemble):
 
   dataset = data("")
   datatypes = None
@@ -136,8 +136,8 @@ def Run(input_data, label_name, num_boost):
 
   predictions = [[] for i in xrange(len(test_dataset.examples))]
 
-  # Boosting
-  for num in range(num_boost):
+  # Ensemble
+  for num in range(num_ensemble):
     new_train_idx_neg = np.random.choice(num_neg_training, num_pos_training, replace=False).tolist()
     training_dataset.examples = [ positive_samples[i] for i in train_idx_positive ] +\
                                 [ negative_samples[i] for i in new_train_idx_neg ]
@@ -154,7 +154,7 @@ def Run(input_data, label_name, num_boost):
   for pred_group in predictions:
     counter = Counter(pred_group)
     # Binary class
-    print counter
+    # print counter
     assert(len(counter) <= 2)
     if len(counter) == 2:
       if counter[counter.keys()[0]] > counter[counter.keys()[1]]:
@@ -213,9 +213,24 @@ def main():
     exit()
 
   input_data = pd.read_csv(args[1])
+  # CLA
+  #selected_feature = ['MR1GESTAGESONW', 'MR1WGHTLBR', 'MR1BPDIAST', 'FAMCLOSE', 'CHURCHCHNG', 'ACIEVENEGPOS', 'EATCHNGNEGPOS', 'FVURINE', 'RECCHNGNEGPOS', 'FAMCLOSENEGPOS',  'FIREDNEGPOS', 'MR1BPSYST', 'NEWPLCNEGPOS', 'CHURCHCHNGNEGPOS', 'SEP', 'ILL', 'ARGUECHNG', 'ILLNEGPOS', 'FINCHNGNEGPOS', 'WRKCHNGNEGPOS', 'REUNION',     'NEWFAMNEGPOS', 'LIVINGCHNG', 'SEPNEGPOS', 'FIRED', 'MR1WBC', 'WRKCHNG', 'REUNIONNEGPOS', 'SOCCHNG', 'HUSBWRKCHNG']
+
+  # WMA
+  #selected_feature = ['MR1WBC', 'EATCHNGNEGPOS', 'SEXDIFF', 'FAMCLOSENEGPOS', 'SEPNEGPOS', 'CHURCHCHNG', 'CHURCHCHNGNEGPOS', 'MR1FHY', 'NEWFAMNEGPOS', 'ARGUECHNGNEGPOS', 'FAMCLOSE', 'NEWPLC', 'REUNION', 'NEWPLCNEGPOS', 'REUNIONNEGPOS', 'SEP', 'FAMILL', 'ARGUECHNG', 'FAMILLNEGPOS', 'FINCHNG', 'NEWJOBNEGPOS', 'FINCHNGNEGPOS', 'NEWJOB', 'DISINFECTANT', 'MR1FPOSIT', 'NEWFAM', 'WRKCHNG', 'HUSBWRKCHNG', 'ACIEVENEGPOS', 'VIOL']
+
+  # OFA
+  #selected_feature = ['FVCURRWT', 'FVBPSYS', 'MR1GESTAGESONW', 'MR1WBC', 'FVURINE', 'FVCURRHT_INCH', 'MR1PLTS', 'FVWATDRINK', 'FVBPDIAS', 'MR1FBS', 'SVHEALTH', 'MR1FPOSIT', 'DATEPRENATCAREM', 'MR1MCHC', 'WKSWHENPREG', 'WATSTORE', 'LAUNDRYPROD', 'ALCDAYS', 'LASTALC', 'MR1BPSYST', 'BUGSV2', 'FVWATCOOK', 'IHV_LOTION', 'MR1FIRSTSONG', 'MR1WGHTLBR', 'WATSTOREMAT', 'ALCDRINKS', 'DRUGUSE', 'FVCHORETIME', 'MARIJUSE']
+
+  # CAA
+  selected_feature = ['FVBPDIAS', 'MR1WBC', 'MR1MCHC', 'FVINC', 'CSECTION', 'MR1MCH', 'MR1NEUTRPH', 'MR1PLTS', 'SVHEALTH', 'FVCHORETIME', 'MR1RBC', 'FVCURRWT', 'MR1GESTAGESONW', 'ULTRAGESTAGED_FV', 'RACE__3', 'RACE__2', 'RACE__1', 'HISPORG', 'HISP', 'FVMARSTAT', 'RESIDCHANG', 'RACE__4', 'CHILDNUM', 'FVURINE', 'PATED', 'MR1HCT', 'MEDAORALTYPE', 'SMKQUIT', 'LASTCIG', 'SMKDAILY_MY']
+  if len(selected_feature) != 0:
+    selected_feature = selected_feature + [args[2]]
+    print "Evaluate the selected features"
+    input_data = input_data[selected_feature]
   accuracy, fnr, fpr, auc = Run(input_data, args[2], int(args[3]))
-  print accuracy
-  print auc
+  print "Accuracy: ", accuracy
+  print "AUC: ", auc
 
 
 if __name__ == "__main__":
