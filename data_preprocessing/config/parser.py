@@ -40,14 +40,23 @@ def read_config():
     config_yaml = yaml.load(f, Loader=Loader)
 
     # Obtain the DD file
-    data_dict_dir = cur_working_path+"/"+config_yaml["data_dict_dir"]
-    data_dict_name = data_dict_dir+"/"+config_yaml["data_dict_name"]
+    data_dict_dir = os.path.join(cur_working_path, config_yaml["data_dict_dir"])
+    data_dict_name = os.path.join(data_dict_dir, config_yaml["data_dict_name"])
     assert os.path.isfile(data_dict_name), "Human subject data dictionary does not exist"
     config_.data_dict = data_dict_name
 
     # Obtain the data files
-    data_dir = cur_working_path+"/"+config_yaml["data_dir"]
+    data_dir = os.path.join(cur_working_path, config_yaml["data_dir"])
     assert os.path.isdir(data_dir), "Data directory does not exist"
-    os.walk(data_dir)
+    for fname in os.listdir(data_dir):
+      data_file = os.path.join(data_dir, fname)
+      if os.path.isdir(data_file):
+        continue
+      config_.data_list.append(data_file)
+    assert len(config_.data_list) > 0, "No data found"
 
-    config_.data_dir = config_yaml["data_dir"]
+    # Obtain the label file
+    label_dir = os.path.join(cur_working_path, config_yaml["label_dir"])
+    label_name = os.path.join(label_dir, config_yaml["label_name"])
+    assert os.path.isfile(label_name), "Label file does not exist"
+    config_.label_file = label_name
