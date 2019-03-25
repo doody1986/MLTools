@@ -56,7 +56,9 @@ def read_config():
     assert len(config_.data_list) > 0, "No data found"
 
     # Obtain the label file
-    label_dir = os.path.join(cur_working_path, config_yaml["label_dir"])
-    label_name = os.path.join(label_dir, config_yaml["label_name"])
-    assert os.path.isfile(label_name), "Label file does not exist"
-    config_.label_file = label_name
+    label_dir = os.path.join(cur_working_path, config_yaml["label_file_dir"])
+    label_name = os.path.join(label_dir, config_yaml["label_file_name"])
+    if os.path.isfile(label_name):
+      config_.label_file = label_name
+    else:
+      print("Warning: Label file does not exist, use the label in V4 data")
