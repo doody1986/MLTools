@@ -5,7 +5,7 @@ from yaml import Loader
 class Config:
   def __init__(self):
     self.data_dict = ""
-    self.data_map = {}
+    self.data_path_map = {}
     self.label_file = ""
 
 # A global configutration object
@@ -63,15 +63,14 @@ def read_config():
     assert os.path.isdir(data_dir), "Data directory does not exist"
     # Extract the data map
     for visit in os.listdir(data_dir):
-      if visit not in config_.data_map:
-        config_.data_map[visit] = []
+      if visit not in config_.data_path_map:
+        config_.data_path_map[visit] = []
       visit_dir = os.path.join(data_dir, visit)
       assert os.path.isdir(visit_dir), "Visit directory does not exist"
       for fname in os.listdir(visit_dir):
         data_file = os.path.join(visit_dir, fname)
-        config_.data_map[visit].append(data_file)
-        print(len(config_.data_map[visit]))
-      assert len(config_.data_map[visit]) > 0, "No data found in "+visit
+        config_.data_path_map[visit].append(data_file)
+      assert len(config_.data_path_map[visit]) > 0, "No data found in "+visit
 
     # Obtain the label file
     label_dir = os.path.join(cur_working_path, config_yaml["label_file_dir"])
