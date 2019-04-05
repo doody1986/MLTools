@@ -2,30 +2,43 @@ import collections
 import re
 import pandas as pd
 import numpy as np
-import time
-from googletrans import Translator
+import copy
+import sys
+import os
 
 
 regex_logic_equal = re.compile(r"\[(\w+)\]\s?(=)\s?'(\d+)'")
 regex_logic_not_equal = re.compile(r"\[(\w+)\]\s?(<>)\s?'(\d+)'")
-
-# Need special care
-# Need to add suffix to each features using visit ID
-combo_table_list = ['product_use']
+regex_checkbox_feature = re.compile(r".*(__)\d+")
 
 # Universal feature names
-useless_features = ['FACILITY_ID', 'SYS_LOC_CODE', 'REDCAP_EVENT_NAME', 'EBATCH']
-study_id_feature = 'SYS_LOC_CODE'
+useless_features = ['FACILITY_ID', 'SUBFACILITY_CODE', 'REDCAP_EVENT_NAME', 'EBATCH']
+
+# Form to visit map
+form_to_visit_dict = {'first_visit':'V1', 'med_rec_v1':'V1', 'inhome_visit':'V2',
+                      'inhome_visit_2nd_part':'V2', '':'V'}
+
 
 
 class Data:
-  def __init__(self, data_file, data_dictionary, no_ambiguous_data = False):
+  def __init__(self, data_file, no_ambiguous_data = False):
     self.file_name = data_file
     self.df = pd.read_csv(data_file, low_memory=False)
-    # Directly drop the useless features from SQL server
-    self.df.drop(useless_features, axis=1, inplace=True)
+
     self.data_columns = self.df.columns.to_list()
     self.data_indices = self.df.index.to_list()
+
+    # Directly drop the useless features from SQL server
+    real_useless_features = [x for x in useless_features if x in self.data_columns]
+    for s in self.data_columns:
+      if 'COMPLETE' in s:
+        real_useless_features.append(s)
+    print(real_useless_features)
+    self.df.drop(real_useless_features, axis=1, inplace=True)
+
+    # Update the data columns
+    self.data_columns = self.df.columns.to_list()
+
     self.no_ambiguous_data = no_ambiguous_data
 
     self.categorical_features = []
@@ -56,24 +69,33 @@ class DataDict:
 
 
 class Manager:
-  def __init__(self, data_path_map, data_dictionary_path):
+  def __init__(self, data_path_map, data_dictionary_path, prefill_table_path=''):
     # Extract data dictionary
     self.data_dictionary = DataDict(data_dictionary_path)
     self.extract_dd()
     
     self.data_map = {}
+    self.combined_data_by_visit = {}
+
     # Get data
     for visitid in data_path_map:
       if visitid not in self.data_map:
         self.data_map[visitid] = []
       for data_file in data_path_map[visitid]:
-        data = Data(data_file, self.data_dictionary)
+        data = Data(data_file)
         self.data_map[visitid].append(data)
+      if visitid not in self.combined_data_by_visit:
+        self.combined_data_by_visit[visitid] = None
 
     self.completeness_threshold = 0.8
-    self.prefill_val_dict = collections.OrderedDict()
+    self.prefill_table_path = prefill_table_path
+    self.prefill_val_df = pd.read_csv(self.prefill_table_path)
+    self.prefill = True
+    self.study_id_feature = 'SYS_LOC_CODE'
+
 
   def extract_dd(self):
+    print("====Data Dictionary Extraction Starts...====")
     # Human subject data
     dd = self.data_dictionary
     for idx in dd.dd_indices:
@@ -88,68 +110,102 @@ class Manager:
         field_choices = row[dd.choice_index]
         sepintlist = field_choices.split('|')
         for item in sepintlist:
-          found_int = re.search("\d+", item)
+          found_int = re.search("-?\d+", item)
           dd.global_checkbox_features.append(row[dd.feature_index].upper() + "__" + str(found_int.group()))
           dd.global_mixed_features.append(row[dd.feature_index].upper() + "__" + str(found_int.group()))
       else:
         dd.global_text_features.append(row[dd.feature_index].upper())
+    print("====Data Dictionary Extraction Finished====")
 
-  def add_prefill_value_for_features_with_deps(self):
+  def generate_prefill_val_table_for_features_with_deps(self):
     # Need further action to make use of files
-    dd = self.data_dicationary
-    # Translator
-    translator = Translator()
+    print("====Generate Prefill Value Table Starts...====")
+    dd = self.data_dictionary
+
+    # Features in the prefill table
+    headers = self.prefill_val_df.columns.to_list()
+    features_prefill_table = self.prefill_val_df[headers[0]].to_list()
 
     # Human subject data
+    num_idx = len(dd.dd_indices)
     for idx in dd.dd_indices:
+      # Print the progress
+      sys.stdout.write('\r>> Progress %.1f%%' % (float(idx + 1) / float(num_idx) * 100.0))
+      sys.stdout.flush()
+
       row = dd.df.loc[idx].tolist()
-      if row[dd.branch_logic_index] == "" or row[dd.choice_index] == "":
+      depending_logic = row[dd.branch_logic_index]
+      choices = row[dd.choice_index]
+      if depending_logic == "" or choices == "":
         continue
 
-      choices = translator.translate(row[dd.choice_index]).text.encode('utf-8')
-      description = translator.translate(row[dd.description_index]).text.encode('utf-8')
+      # Skip this feature if we already have it
+      feature_name = row[dd.feature_index].upper()
+      if feature_name in features_prefill_table:
+        continue
+
+      # Special case for checkbox feature
+      checkbox_features = [m.group(0) for l in features_prefill_table
+                           for m in [regex_checkbox_feature.search(l)] if m]
+      skip = False
+      for feature in checkbox_features:
+        if feature_name in feature:
+          skip = True
+      if skip:
+        continue
+
       sepintlist = choices.split('|')
       choice_list = []
       for item in sepintlist:
         choice_list.append(int(re.search("(-?\d+),", item).group(1)))
-      # Let the google translation server relax
-      time.sleep(0.5)
 
       # Obtain current field specific information
+      prefill_val = 0
       if row[dd.type_index] == "radio" or row[dd.type_index] == 'dropdown':
-        feature_name = row[dd.feature_index].upper()
         if 0 not in choice_list:
-          self.prefill_val_dict[feature_name] = 0
-        elif "medication" in description.lower() or "medicine" in description.lower():
-          self.prefill_val_dict[feature_name] = 0
-        elif "characteristics" in description.lower():
-          self.prefill_val_dict[feature_name] = 0
-        elif "smoke" in description.lower():
-          self.prefill_val_dict[feature_name] = 0
+          prefill_val = 0
         elif 999 in choice_list:
-          self.prefill_val_dict[feature_name] = 999
+          prefill_val = 999
+        elif 999 not in choice_list and 888 not in choice_list:
+          prefill_val = min(choice_list) - 1
+        elif min(choice_list) < 0:
+          prefill_val = 0
+        self.prefill_val_df = \
+          self.prefill_val_df.append({headers[0]: feature_name,
+                                      headers[1]: prefill_val,
+                                      headers[2]: depending_logic}, ignore_index=True)
 
       elif row[dd.type_index] == 'checkbox':
         for c in choice_list:
-          feature_name = row[dd.field_index].upper() + "__" + str(c)
-          self.prefill_val_dict[feature_name] = 0
+          feature_name = row[dd.feature_index].upper() + "__" + str(c)
+          self.prefill_val_df = \
+            self.prefill_val_df.append({headers[0]: feature_name,
+                                        headers[1]: 0,
+                                        headers[2]: depending_logic}, ignore_index=True)
+    if self.prefill_table_path:
+      self.prefill_val_df.to_csv(self.prefill_table_path, index=False)
+    else:
+      cur_working_path = os.getcwd()
+      self.prefill_table_path = os.path.join(cur_working_path, "prefill_value_table.csv")
+      self.prefill_val_df.to_csv(self.prefill_table_path, index=False)
+    print("\n====Generate Prefill Value Table Finished====")
 
 
   # visitid is a string
   def filter(self, visitid, index):
+    print("====Data Filtering Starts...====")
     data = self.data_map[visitid][index]
 
     if data.no_ambiguous_data:
       data.df.replace(888, np.nan, inplace=True, regex=True)
       data.df.replace(999, np.nan, inplace=True, regex=True)
-    print("Begin filtering...")
     print(data.file_name)
     print("The column number of raw data BEFORE filtered is: "+str(len(data.data_columns)))
 
     # Filter out data columns on feature basis
     removelist_column = []
     for column in data.data_columns:
-      if column == study_id_feature:
+      if column == self.study_id_feature:
         continue
 
       # Remove unchosen features
@@ -193,7 +249,24 @@ class Manager:
     data.df.reset_index(drop=True)
     data.data_indices = data.df.index.to_list()
     print("The row number of raw data AFTER filtered is: " + str(len(data.data_indices)))
-    print("Filtering finished")
+    print("====Data Filtering Finished====")
+  
+  def merge_by_visit(self, visitid):
+    print("====Internal Merge Starts...====")
+    print("Visit: "+visitid)
+    data_per_visit = self.data_map[visitid]
+    num_data = len(data_per_visit)
+    # Use copy to avoid modify original data
+    local_data  = copy.deepcopy(data_per_visit[0])
 
+    for i in range(1, num_data):
+      local_data.df = local_data.df.merge(data_per_visit[i].df, on=self.study_id_feature)
+      local_data.categorical_features = local_data.categorical_features + data_per_visit[i].categorical_features
+      local_data.checkbox_features = local_data.checkbox_features + data_per_visit[i].checkbox_features
+      local_data.numerical_features = local_data.numerical_features + data_per_visit[i].numerical_features
+    local_data.data_columns = local_data.df.columns.to_list()
+    local_data.data_indices = local_data.df.index.to_list()
+    self.combined_data_by_visit[visitid] = local_data
+    print("====Internal Merge Finished...====")
 
 
