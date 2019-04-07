@@ -7,8 +7,7 @@ import sys
 import os
 
 
-regex_logic_equal = re.compile(r"\[(\w+)\]\s?(=)\s?'(\d+)'")
-regex_logic_not_equal = re.compile(r"\[(\w+)\]\s?(<>)\s?'(\d+)'")
+logic_regex_str = r"\[(\w+)\]\s?(=|<>|<|>|>=|<=)\s?'(\d+)'\s?(or|and)?"
 regex_checkbox_feature = re.compile(r".*(__)\d+")
 
 # Universal feature names
@@ -33,7 +32,6 @@ class Data:
     for s in self.data_columns:
       if 'COMPLETE' in s:
         real_useless_features.append(s)
-    print(real_useless_features)
     self.df.drop(real_useless_features, axis=1, inplace=True)
 
     # Update the data columns
@@ -90,7 +88,6 @@ class Manager:
     self.completeness_threshold = 0.8
     self.prefill_table_path = prefill_table_path
     self.prefill_val_df = pd.read_csv(self.prefill_table_path)
-    self.prefill = True
     self.study_id_feature = 'SYS_LOC_CODE'
 
 
@@ -189,6 +186,60 @@ class Manager:
       self.prefill_table_path = os.path.join(cur_working_path, "prefill_value_table.csv")
       self.prefill_val_df.to_csv(self.prefill_table_path, index=False)
     print("\n====Generate Prefill Value Table Finished====")
+
+  def prefill(self, visitid, index):
+    # Need further action to make use of files
+    print("====Prefill Starts...====")
+    dd = self.data_dictionary
+    prefill_table = self.prefill_val_df
+    data = self.data_map[visitid][index]
+
+    # Header - 0: Features 1: Pre-Filled Value 2: Depending Logic
+    headers = self.prefill_val_df.columns.to_list()
+    feature_set = prefill_table[headers[0]].to_list()
+
+    # Human subject data
+    num_idx = len(data.data_indices)
+    for idx in data.data_indices:
+      # Print the progress
+      sys.stdout.write('\r>> Progress %.1f%%' % (float(idx + 1) / float(num_idx) * 100.0))
+      sys.stdout.flush()
+      for feature in data.data_columns:
+        if feature not in feature_set:
+          continue
+        if not pd.isnull(data.df.loc[idx, feature]):
+          continue
+        depending_logic = self.prefill_val_df.loc[self.prefill_val_df[headers[0]]==feature,
+                                              headers[2]].to_list()[0]
+        prefill_val = self.prefill_val_df.loc[self.prefill_val_df[headers[0]]==feature,
+                                              headers[1]].to_list()[0]
+        matches = re.findall(logic_regex_str, depending_logic)
+        logic_operator = ''
+        # Two conditions
+        if len(matches) == 1:
+          condition_feat = matches[0][0].upper()
+          condition_comp = matches[0][1]
+          condition_val = matches[0][2]
+          if condition_comp == "=" and data.df.loc[idx, condition_feat] != int(condition_val):
+            data.df.loc[idx, feature] = prefill_val
+          if condition_comp == "<>" and data.df.loc[idx, condition_feat] == int(condition_val):
+            data.df.loc[idx, feature] = prefill_val
+          if condition_comp == ">=" and data.df.loc[idx, condition_feat] < int(condition_val):
+            data.df.loc[idx, feature] = prefill_val
+          assert(not pd.isnull(data.df.loc[idx, feature]), "Still NAN")
+        elif len(matches) == 2:
+          # Ignore so far TBD
+          continue
+          #logic_operator = matches[0][3]
+          #assert(len(matches)==4, "No logic operator")
+          #condition1_feat = matches[0][0]
+          #condition1_comp = matches[0][1]
+          #condition1_val = matches[0][2]
+          #condition2_feat = matches[1][0]
+          #condition2_comp = matches[1][1]
+          #condition2_val = matches[1][2]
+
+    print("\n====Prefill Finished====")
 
 
   # visitid is a string
