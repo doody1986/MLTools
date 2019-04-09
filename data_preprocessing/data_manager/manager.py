@@ -89,6 +89,8 @@ class Manager:
     self.prefill_table_path = prefill_table_path
     self.prefill_val_df = pd.read_csv(self.prefill_table_path)
     self.study_id_feature = 'SYS_LOC_CODE'
+    self.all_visits = ['V1', 'V2', 'V3', 'V4']
+    self.processed_data = None
 
 
   def extract_dd(self):
@@ -187,12 +189,20 @@ class Manager:
       self.prefill_val_df.to_csv(self.prefill_table_path, index=False)
     print("\n====Generate Prefill Value Table Finished====")
 
+  def prefill_all(self):
+    for visitid in self.all_visits:
+      for i in range(len(self.data_map[visitid])):
+        self.prefill(visitid, i)
+
   def prefill(self, visitid, index):
     # Need further action to make use of files
     print("====Prefill Starts...====")
+    print("Visit: " + visitid)
+
     dd = self.data_dictionary
     prefill_table = self.prefill_val_df
     data = self.data_map[visitid][index]
+    print("Form: " + data.file_name)
 
     # Header - 0: Features 1: Pre-Filled Value 2: Depending Logic
     headers = self.prefill_val_df.columns.to_list()
@@ -241,11 +251,18 @@ class Manager:
 
     print("\n====Prefill Finished====")
 
+  def filter_all(self):
+    for visitid in self.all_visits:
+      for i in range(len(self.data_map[visitid])):
+        self.filter(visitid, i)
 
   # visitid is a string
   def filter(self, visitid, index):
     print("====Data Filtering Starts...====")
+    print("Visit: "+visitid)
+
     data = self.data_map[visitid][index]
+    print("Form: " +data.file_name)
 
     if data.no_ambiguous_data:
       data.df.replace(888, np.nan, inplace=True, regex=True)
@@ -301,7 +318,11 @@ class Manager:
     data.data_indices = data.df.index.to_list()
     print("The row number of raw data AFTER filtered is: " + str(len(data.data_indices)))
     print("====Data Filtering Finished====")
-  
+
+  def merge_by_all_visit(self):
+    for visitid in self.all_visits:
+      self.merge_by_visit(visitid)
+
   def merge_by_visit(self, visitid):
     print("====Internal Merge Starts...====")
     print("Visit: "+visitid)
