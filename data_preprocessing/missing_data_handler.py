@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import sys
+from scipy.spatial.distance import pdist, squareform
 
 def one_hot_encoding(data, categorical_features, checkbox_features):
   # One-hot encoding categorical data
@@ -37,7 +39,13 @@ def normalize_numerical_data(data, numberical_features, study_id_feature):
     data[column] = data[column] / max_
   return data
 
+def calc_similarity(u, v):
+  product = u * v
+  count = np.count_nonzero(~np.isnan(product))
+  return np.nansum(product) / float(count)
+
 def handler(data, categorical_features, checkbox_features, numberical_features, study_id_feature):
+  print("====Missing Data Handling Starts...====")
   # Calculate similarity matrix
   temp_data = data.copy()
   onehot_data = one_hot_encoding(temp_data, categorical_features, checkbox_features)
@@ -48,26 +56,33 @@ def handler(data, categorical_features, checkbox_features, numberical_features, 
   num_sample = len(indices)
 
   # Initialize the similarity matrix
-  similarity_mat = []
-  for i in range(num_sample):
-    similarity_mat.append([-999999]*num_sample)
+  # similarity_mat = []
+  # for i in range(num_sample):
+  #   similarity_mat.append([-999999]*num_sample)
 
   # Do the calculation
-  for i in range(num_sample):
-    for j in range(i+1, num_sample):
-      similarity = 0
-      data_i = normalized_data.values[i]
-      data_j = normalized_data.values[j]
-      product = data_i * data_j
-      count = np.count_nonzero(~np.isnan(product))
-      similarity = np.nansum(product) / float(count)
-      similarity_mat[i][j] = similarity
-      similarity_mat[j][i] = similarity
-  print "Similarity matrix construction done"
+  print("Constructing similarity matrix")
+  # for i in range(num_sample):
+  #   sys.stdout.write('\r>> Progress %.1f%%' % (float(i + 1) / float(num_sample) * 100.0))
+  #   sys.stdout.flush()
+  #   for j in range(i+1, num_sample):
+  #     data_i = normalized_data.values[i]
+  #     data_j = normalized_data.values[j]
+  #     product = data_i * data_j
+  #     count = np.count_nonzero(~np.isnan(product))
+  #     similarity = np.nansum(product) / float(count)
+  #     similarity_mat[i][j] = similarity
+  #     similarity_mat[j][i] = similarity
+  similarity_mat = squareform(pdist(normalized_data.values, calc_similarity))
+  print("Similarity matrix construction done")
 
   # Missing data handling
+  print("Handling missing data")
   num_try = 100
   for i in range(num_sample):
+    # Print the progress
+    sys.stdout.write('\r>> Progress %.1f%%' % (float(i + 1) / float(num_sample) * 100.0))
+    sys.stdout.flush()
     for f in features:
       if np.isnan(data[f][indices[i]]):
         similarity_sample = similarity_mat[i]
@@ -77,10 +92,11 @@ def handler(data, categorical_features, checkbox_features, numberical_features, 
           if np.isnan(data[f][sorted_index[num]]):
             continue
           else:
-            print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
+            #print "Attempts:", num, "Selected Similarity:", sorted_similarity_sample[num]
             data.loc[indices[i], f] = data[f][sorted_index[num]]
             break
         if np.isnan(data[f][indices[i]]):
           print "Number of try is not enough"
           exit()
+  print("\n====Missing Data Handling Finished...====\n")
   return data

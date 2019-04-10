@@ -63,14 +63,26 @@ class DataDict:
     self.global_numerical_features = []
     self.global_mixed_features = [] # Include both numerical and categorical/checkbox
 
-
+class Label:
+  def __init__(self, label_file):
+    self.df = pd.read_csv(label_file)
+    # Very file specific, not general
+    self.df = self.df.replace('NA', np.nan, regex=True)
+    self.study_id_feature = 'studyid'
+    self.label_feature = 'preterm_best'
 
 
 class Manager:
-  def __init__(self, data_path_map, data_dictionary_path, prefill_table_path=''):
+  def __init__(self, data_path_map, data_dictionary_path, label_path, prefill_table_path=''):
     # Extract data dictionary
     self.data_dictionary = DataDict(data_dictionary_path)
     self.extract_dd()
+
+    # Extract label file
+    if label_path != "":
+      self.labels = Label(label_path)
+    else:
+      self.labels = None
     
     self.data_map = {}
     self.combined_data_by_visit = {}
@@ -90,8 +102,9 @@ class Manager:
     self.prefill_val_df = pd.read_csv(self.prefill_table_path)
     self.study_id_feature = 'SYS_LOC_CODE'
     self.all_visits = ['V1', 'V2', 'V3', 'V4']
+    self.label_feature = 'PPTERM'
+    self.label_visit = 'V4'
     self.processed_data = None
-
 
   def extract_dd(self):
     print("====Data Dictionary Extraction Starts...====")
@@ -114,7 +127,7 @@ class Manager:
           dd.global_mixed_features.append(row[dd.feature_index].upper() + "__" + str(found_int.group()))
       else:
         dd.global_text_features.append(row[dd.feature_index].upper())
-    print("====Data Dictionary Extraction Finished====")
+    print("====Data Dictionary Extraction Finished====\n")
 
   def generate_prefill_val_table_for_features_with_deps(self):
     # Need further action to make use of files
@@ -187,7 +200,7 @@ class Manager:
       cur_working_path = os.getcwd()
       self.prefill_table_path = os.path.join(cur_working_path, "prefill_value_table.csv")
       self.prefill_val_df.to_csv(self.prefill_table_path, index=False)
-    print("\n====Generate Prefill Value Table Finished====")
+    print("\n====Generate Prefill Value Table Finished====\n")
 
   def prefill_all(self):
     for visitid in self.all_visits:
@@ -249,7 +262,7 @@ class Manager:
           #condition2_comp = matches[1][1]
           #condition2_val = matches[1][2]
 
-    print("\n====Prefill Finished====")
+    print("\n====Prefill Finished====\n")
 
   def filter_all(self):
     for visitid in self.all_visits:
@@ -317,7 +330,7 @@ class Manager:
     data.df.reset_index(drop=True)
     data.data_indices = data.df.index.to_list()
     print("The row number of raw data AFTER filtered is: " + str(len(data.data_indices)))
-    print("====Data Filtering Finished====")
+    print("====Data Filtering Finished====\n")
 
   def merge_by_all_visit(self):
     for visitid in self.all_visits:
@@ -328,6 +341,7 @@ class Manager:
     print("Visit: "+visitid)
     data_per_visit = self.data_map[visitid]
     num_data = len(data_per_visit)
+
     # Use copy to avoid modify original data
     local_data  = copy.deepcopy(data_per_visit[0])
 
@@ -339,6 +353,39 @@ class Manager:
     local_data.data_columns = local_data.df.columns.to_list()
     local_data.data_indices = local_data.df.index.to_list()
     self.combined_data_by_visit[visitid] = local_data
-    print("====Internal Merge Finished...====")
+    print("====Internal Merge Finished...====\n")
+
+
+  def update_label(self):
+    print("====Update label Starts...====")
+    if self.labels is None:
+      print("====No label files, update aborted====\n")
+      return
+    if self.label_visit not in self.data_map:
+      print("====No V4 data forms, update aborted====\n")
+      return
+    old_labels = self.data_map[self.label_visit][0]
+    old_labels_df = old_labels.df[[self.study_id_feature,
+                                   self.label_feature]]
+    new_labels = self.labels
+    new_labels_df = new_labels.df[[self.labels.study_id_feature,
+                                   self.labels.label_feature]]
+    new_labels_indices = new_labels_df.index.to_list()
+    for idx in new_labels_indices:
+      # Print the progress
+      sys.stdout.write('\r>> Progress %.1f%%' % (float(idx + 1) / float(len(new_labels_indices)) * 100.0))
+      sys.stdout.flush()
+      label_new = new_labels_df.loc[idx, new_labels.label_feature] + 1.0
+      study_id = new_labels_df.loc[idx, new_labels.study_id_feature]
+      if len(old_labels_df[old_labels_df[self.study_id_feature] == study_id].index.to_list()) > 0:
+        idx_in_old_labels = old_labels_df[old_labels_df[self.study_id_feature] == study_id].index.to_list()[0]
+      label_old = old_labels_df.loc[idx_in_old_labels, self.label_feature]
+
+      #print label_new
+      if label_new == label_old or np.isnan(label_new):
+        continue
+      else:
+        old_labels.df.loc[idx_in_old_labels, self.label_feature] = label_new
+    print("====Label File Extraction Finished====\n")
 
 
