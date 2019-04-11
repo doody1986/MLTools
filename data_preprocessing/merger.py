@@ -1,3 +1,4 @@
+import numpy as np
 
 def merger(combined_data_by_visit, study_id_feature, visit_list, label_updated):
   print("====Merging Starts...====")
@@ -24,6 +25,13 @@ def merger(combined_data_by_visit, study_id_feature, visit_list, label_updated):
 
   # Remove the STUDY_ID column
   data.drop(study_id_feature, axis=1, inplace=True)
+
+  # Drop the row in which label is empty
+  removelist_idx = []
+  for i in data.index.to_list():
+    if np.isnan(data.loc[i, 'PPTERM']):
+      removelist_idx.append(i)
+  data.drop(removelist_idx, axis=0, inplace=True)
 
   print("====Merging Finished...====\n")
 

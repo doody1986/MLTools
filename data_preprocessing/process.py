@@ -36,12 +36,16 @@ for visitid in manager.all_visits:
                                  manager.combined_data_by_visit[visitid].numerical_features,
                                  manager.study_id_feature)
 
-# Merge
+# Merge all
+# manager.processed_data = merger.merger(manager.combined_data_by_visit,
+#                                        manager.study_id_feature,
+#                                        manager.all_visits, manager.label_updated)
+
 manager.processed_data = merger.merger(manager.combined_data_by_visit,
                                        manager.study_id_feature,
-                                       manager.all_visits)
+                                       ['V1', 'V2'], manager.label_updated)
 
 if manager.processed_data is not None:
-  manager.processed_data.to_csv("test.csv", index=False)
+  manager.processed_data.to_csv("test_v1_v2.csv", index=False)
 
 
