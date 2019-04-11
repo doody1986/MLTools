@@ -106,6 +106,8 @@ class Manager:
     self.label_visit = 'V4'
     self.processed_data = None
 
+    self.label_updated = False
+
   def extract_dd(self):
     print("====Data Dictionary Extraction Starts...====")
     # Human subject data
@@ -386,6 +388,9 @@ class Manager:
         continue
       else:
         old_labels.df.loc[idx_in_old_labels, self.label_feature] = label_new
-    print("====Label File Extraction Finished====\n")
+    self.label_updated = True
+    print("====Update label Finished====\n")
+
+
 
 
