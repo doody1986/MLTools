@@ -2,7 +2,7 @@ import numpy as np
 import re
 import sys
 
-regex_feature_suffix = re.compile(r".*V\d$")
+regex_feature_suffix = re.compile(r".*(V\d)$")
 
 def merger(combined_data_by_visit, study_id_feature, visit_list, label_updated,
            need_verify = False, datamap = None):
@@ -42,18 +42,20 @@ def merger(combined_data_by_visit, study_id_feature, visit_list, label_updated,
       sys.stdout.write('\r>> Progress %.1f%%' % (float(count + 1) / num_verify * 100.0))
       sys.stdout.flush()
       current_feat = feature_list[i]
+      implicit_visitid = ""
       if regex_feature_suffix.match(current_feat):
         current_feat_raw = current_feat[:-2]
+        implicit_visitid = regex_feature_suffix.match(current_feat).group(1)
       else:
         current_feat_raw = current_feat
-      for visitid in datamap:
+      for visitid in visit_list:
         for raw_data in datamap[visitid]:
-          if current_feat not in raw_data.data_columns:
+          if current_feat_raw not in raw_data.data_columns:
+            continue
+          if implicit_visitid != visitid:
             continue
           current_df = raw_data.df
           for study_id in study_id_list:
-            if study_id not in current_df[study_id_feature].to_list():
-              continue
             val_in_processed_data = data.loc[data[study_id_feature]==study_id, current_feat].values.tolist()[0]
             val_in_raw_data = current_df.loc[current_df[study_id_feature]==study_id, current_feat_raw].values.tolist()[0]
             if np.isnan(val_in_raw_data):

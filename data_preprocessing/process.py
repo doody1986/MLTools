@@ -45,6 +45,12 @@ for visitid in manager.all_visits:
 #                                        manager.study_id_feature,
 #                                        manager.all_visits, manager.label_updated)
 
+# Merge with verification enabled
+# manager.processed_data = merger.merger(manager.combined_data_by_visit,
+#                                        manager.study_id_feature,
+#                                        ['V1', 'V2'], manager.label_updated,
+#                                        True, manager.data_map)
+
 # Merge based on the visit options
 filename = filename_prefix
 for opt in visit_options:
