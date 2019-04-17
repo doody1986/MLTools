@@ -45,6 +45,7 @@ Thumbs.db
 # Test files        #
 #####################
 *.csv
+*.csv#
 *.html
 *.xsd
 *.vb

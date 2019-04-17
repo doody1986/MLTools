@@ -1,27 +1,18 @@
 #! /usr/bin/env python
 
-import math
-import operator
-import time
-import random
-import copy
 import sys
 import ast
-import csv
 import random
 from collections import Counter
 import collections
-import numpy as np
 from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn import metrics
 from sklearn import tree
+from sklearn.feature_selection import RFECV
 from sklearn.feature_selection import RFE
 
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-import matplotlib
-
 import pandas as pd
 
 ##################################################
@@ -37,8 +28,8 @@ class data():
 ##################################################
 # function to read in data from the .csv files
 ##################################################
-def read_data(dataset, input_data, datatypes):
-  dataset.examples = input_data[input_data.columns.tolist()].as_matrix().tolist()
+def read_data(dataset, input_data):
+  dataset.examples = input_data[input_data.columns.tolist()].values.tolist()
 
   #list features
   dataset.features = input_data.columns.tolist()
@@ -49,34 +40,35 @@ def read_data(dataset, input_data, datatypes):
 
 # Global parameters
 clf = tree.DecisionTreeClassifier(criterion="entropy")
+
 def feat_ranks(dataset):
-  train_set = [example[:dataset.label_index]+example[dataset.label_index+1:] for example in dataset.examples]
-  train_label = [example[dataset.label_index] for example in dataset.examples]
+  data_per_ensemble = [example[:dataset.label_index]+example[dataset.label_index+1:]
+                       for example in dataset.examples]
+  labels = [example[dataset.label_index] for example in dataset.examples]
+
+  # K fold
+  n_fold = 5
+  kf = KFold(n_splits=n_fold)
 
   # Estimator training
-  clf.fit(train_set, train_label)
+  final_accuracy = 0.0
+  final_auc = 0.0
+  for train_idx, test_idx in kf.split(data_per_ensemble):
+    train_set = [data_per_ensemble[i] for i in train_idx]
+    train_labels = [labels[i] for i in train_idx]
+    test_set = [data_per_ensemble[i] for i in test_idx]
+    ref = [labels[i] for i in test_idx]
+    clf.fit(train_set, train_labels)
+    results = clf.predict(test_set)
+    local_accuracy, local_auc = calc_metric(results, ref)
+    final_accuracy += local_accuracy
+    final_auc += local_auc
 
   # RFE
   rfe = RFE(clf, 1)
-  rfe = rfe.fit(train_set, train_label)
-  return np.array(rfe.ranking_)
+  rfe = rfe.fit(data_per_ensemble, labels)
 
-def validate(dataset):
-  test_set = [example[:dataset.label_index]+example[dataset.label_index+1:] for example in dataset.examples]
-  return clf.predict(test_set)
-
-# The raw_scores is the output from RFE feature selector
-def extract_selected_feat_idx(raw_scores, num_selected_feats):
-  # Extract the corresponding index
-  scores = [(i, e) for i, e in enumerate(raw_scores)]
-
-  # Sort the above list using the scores
-  scores.sort(key=lambda tup: tup[1])
-
-  # Select the corresponding feature indexes
-  feature_indexes = [i for i, e in scores[:num_selected_feats]]
-
-  return feature_indexes
+  return np.array(rfe.ranking_), final_accuracy/float(n_fold), final_auc/float(n_fold)
 
 def calc_metric(results, ref):
   accurate_count = 0
@@ -110,6 +102,19 @@ def calc_metric(results, ref):
   auc = metrics.auc([0.0, false_positive_rate, 1.0], [0.0, true_positive_rate, 1.0])
   return accuracy, auc
 
+# The raw_scores is the output from RFE feature selector
+def extract_selected_feat_idx(raw_scores, num_selected_feats):
+  # Extract the corresponding index
+  scores = [(i, e) for i, e in enumerate(raw_scores)]
+
+  # Sort the above list using the scores
+  scores.sort(key=lambda tup: tup[1])
+
+  # Select the corresponding feature indexes
+  feature_indexes = [i for i, e in scores[:num_selected_feats]]
+
+  return feature_indexes
+
 ##################################################
 # main function, organize data and execute functions based on input
 # need to account for missing data
@@ -118,27 +123,18 @@ def calc_metric(results, ref):
 def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
 
   dataset = data("")
-  datatypes = None
-  read_data(dataset, input_data, datatypes)
-  arg3 = label_name
-  if (arg3 in dataset.features):
-    label_name = arg3
-  else:
-    label_name = dataset.features[-1]
+  read_data(dataset, input_data)
 
   dataset.label_name = label_name
 
   # The features
-  features = dataset.features[:-1]
-  num_feats = len(features)
+  num_feats = len(dataset.features) - 1
   print "The number of features is: ", num_feats
 
   #find index of label_name
   for a in range(len(dataset.features)):
     if dataset.features[a] == dataset.label_name:
       dataset.label_index = a
-    else:
-      dataset.label_index = range(len(dataset.features))[-1]
       
   # Split the data set into training and test set
   training_dataset = data(label_name)
@@ -148,13 +144,9 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
   for a in range(len(dataset.features)):
     if training_dataset.features[a] == training_dataset.label_name:
       training_dataset.label_index = a
-    else:
-      training_dataset.label_index = range(len(training_dataset.features))[-1]
   for a in range(len(dataset.features)):
     if test_dataset.features[a] == test_dataset.label_name:
       test_dataset.label_index = a
-    else:
-      test_dataset.label_index = range(len(test_dataset.features))[-1]
 
   data_samples = dataset.examples
   random.shuffle(data_samples)
@@ -166,42 +158,24 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
   print "The number of negative sample is: ", num_negative
   print "The number of positive sample is: ", num_positive
 
-  test_propotion = 0.1
-
+  # No test data is needed during feature selection
   train_idx_positive = range(num_positive)
-  test_idx_positive = []
   train_idx_negative = range(num_negative)
-  test_idx_negative = []
-  num_test_pos = int(round(num_positive * test_propotion))
-  num_test_neg = int(round(num_negative * test_propotion))
-  test_idx_positive = np.random.choice(num_positive, num_test_pos, replace=False).tolist()
-  test_idx_negative = np.random.choice(num_negative, num_test_neg, replace=False).tolist()
-  train_idx_positive = filter(lambda x: x not in test_idx_positive, train_idx_positive)
-  train_idx_negative = filter(lambda x: x not in test_idx_negative, train_idx_negative)
-  num_pos_training = len(train_idx_positive)
-  num_neg_training = len(train_idx_negative)
-
-  test_dataset.examples = [ positive_samples[i] for i in test_idx_positive ] +\
-                          [ negative_samples[i] for i in test_idx_negative ]
-  random.shuffle(test_dataset.examples)
 
   # Ensemble
   final_feature_list = []
   final_feature_rank = np.zeros(num_feats)
   feature_accuracy_dict = collections.OrderedDict()
-  ref = [example[test_dataset.label_index] for example in test_dataset.examples]
   for num in range(num_ensemble):
-    new_train_idx_neg = np.random.choice(num_neg_training, num_pos_training, replace=False).tolist()
+    new_train_idx_neg = np.random.choice(num_negative, num_positive, replace=False).tolist()
     training_dataset.examples = [ positive_samples[i] for i in train_idx_positive ] +\
                                 [ negative_samples[i] for i in new_train_idx_neg ]
     random.shuffle(training_dataset.examples)
 
-    ranks = feat_ranks(training_dataset)
-
-    results = validate(test_dataset)
-    accuracy, auc = calc_metric(results, ref)
+    ranks, accuracy, auc = feat_ranks(training_dataset)
 
     # Feature Selection
+    features = dataset.features
     if method == "OFA":
       # Feature occurrence frequency
       feat_idx = extract_selected_feat_idx(ranks, num_selected_feats)
@@ -218,7 +192,7 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
       for idx in feat_idx:
         if features[idx] not in feature_accuracy_dict:
           feature_accuracy_dict[features[idx]] = 0
-        feature_accuracy_dict[features[idx]] = feature_accuracy_dict[features[idx]] + accuracy
+        feature_accuracy_dict[features[idx]] += accuracy
       
   
   if method == "OFA":
@@ -236,10 +210,10 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
 def main():
   args = str(sys.argv)
   args = ast.literal_eval(args)
-  if (len(args) < 2):
+  if len(args) < 2:
     print "You have input less than the minimum number of arguments. Go back and read README.txt and do it right next time!"
     exit()
-  if (args[1][-4:] != ".csv"):
+  if args[1][-4:] != ".csv":
     print "Your training file (second argument) must be a .csv!"
     exit()
 

@@ -3,9 +3,6 @@
 import numpy as np
 import pandas as pd
 import sys
-import csv
-import time
-import re
 import collections
 
 def Filter(raw_data_file, tolerated_missing_rate):
