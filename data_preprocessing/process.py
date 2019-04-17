@@ -52,8 +52,8 @@ for visitid in manager.all_visits:
 #                                        True, manager.data_map)
 
 # Merge based on the visit options
-filename = filename_prefix
 for opt in visit_options:
+  filename = filename_prefix
   for visitid in opt:
     filename += '_'+visitid
   manager.processed_data = merger.merger(manager.combined_data_by_visit,
