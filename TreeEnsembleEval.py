@@ -36,7 +36,7 @@ class data():
 # function to read in data from the .csv files
 ##################################################
 def read_data(dataset, input_data, datatypes):
-  dataset.examples = input_data[input_data.columns.tolist()].as_matrix().tolist()
+  dataset.examples = input_data[input_data.columns.tolist()].values.tolist()
 
   #list features
   dataset.features = input_data.columns.tolist()
@@ -62,16 +62,15 @@ def validate_tree(dataset):
 # need to account for missing data
 ##################################################
 
-def Run(input_data, label_name, num_ensemble):
+def Run(input_data, label_name, num_ensemble, selected_features = []):
+  if len(selected_features) != 0:
+    selected_feature = selected_features + [label_name]
+    print "Evaluate the selected features"
+    input_data = input_data[selected_feature]
 
   dataset = data("")
   datatypes = None
   read_data(dataset, input_data, datatypes)
-  arg3 = label_name
-  if (arg3 in dataset.features):
-    label_name = arg3
-  else:
-    label_name = dataset.features[-1]
 
   dataset.label_name = label_name
 
@@ -79,8 +78,6 @@ def Run(input_data, label_name, num_ensemble):
   for a in range(len(dataset.features)):
     if dataset.features[a] == dataset.label_name:
       dataset.label_index = a
-    else:
-      dataset.label_index = range(len(dataset.features))[-1]
       
   # Split the data set into training and test set
   training_dataset = data(label_name)
@@ -90,13 +87,9 @@ def Run(input_data, label_name, num_ensemble):
   for a in range(len(dataset.features)):
     if training_dataset.features[a] == training_dataset.label_name:
       training_dataset.label_index = a
-    else:
-      training_dataset.label_index = range(len(training_dataset.features))[-1]
   for a in range(len(dataset.features)):
     if test_dataset.features[a] == test_dataset.label_name:
       test_dataset.label_index = a
-    else:
-      test_dataset.label_index = range(len(test_dataset.features))[-1]
 
   data_samples = dataset.examples
   random.shuffle(data_samples)
@@ -107,13 +100,6 @@ def Run(input_data, label_name, num_ensemble):
   num_positive = len(positive_samples)
   print "The number of negative sample is: ", num_negative
   print "The number of positive sample is: ", num_positive
-
-  accuracy_list = []
-  false_positive_rate_list = []
-  false_negative_rate_list = []
-  true_positive_rate_list = []
-  auc_list = []
-  fscore_list = []
 
   test_propotion = 0.1
 
@@ -166,15 +152,14 @@ def Run(input_data, label_name, num_ensemble):
     elif len(counter) == 1:
       results.append(counter.keys()[0])
   ref = [example[test_dataset.label_index] for example in test_dataset.examples]
-  print results
-  print ref
+  # print results
+  # print ref
  
   accurate_count = 0
   false_negative_count = 0
   false_positive_count = 0
   true_positive_count = 0
   auc = 0
-  fscore = 0
   preterm_count = 0
   term_count = 0
   for i in range(len(results)):
@@ -214,23 +199,25 @@ def main():
 
   input_data = pd.read_csv(args[1])
   # CLA
-  #selected_feature = ['MR1GESTAGESONW', 'MR1WGHTLBR', 'MR1BPDIAST', 'FAMCLOSE', 'CHURCHCHNG', 'ACIEVENEGPOS', 'EATCHNGNEGPOS', 'FVURINE', 'RECCHNGNEGPOS', 'FAMCLOSENEGPOS',  'FIREDNEGPOS', 'MR1BPSYST', 'NEWPLCNEGPOS', 'CHURCHCHNGNEGPOS', 'SEP', 'ILL', 'ARGUECHNG', 'ILLNEGPOS', 'FINCHNGNEGPOS', 'WRKCHNGNEGPOS', 'REUNION',     'NEWFAMNEGPOS', 'LIVINGCHNG', 'SEPNEGPOS', 'FIRED', 'MR1WBC', 'WRKCHNG', 'REUNIONNEGPOS', 'SOCCHNG', 'HUSBWRKCHNG']
+  #selected_features = ['MR1GESTAGESONW', 'MR1WGHTLBR', 'MR1BPDIAST', 'FAMCLOSE', 'CHURCHCHNG', 'ACIEVENEGPOS', 'EATCHNGNEGPOS', 'FVURINE', 'RECCHNGNEGPOS', 'FAMCLOSENEGPOS',  'FIREDNEGPOS', 'MR1BPSYST', 'NEWPLCNEGPOS', 'CHURCHCHNGNEGPOS', 'SEP', 'ILL', 'ARGUECHNG', 'ILLNEGPOS', 'FINCHNGNEGPOS', 'WRKCHNGNEGPOS', 'REUNION',     'NEWFAMNEGPOS', 'LIVINGCHNG', 'SEPNEGPOS', 'FIRED', 'MR1WBC', 'WRKCHNG', 'REUNIONNEGPOS', 'SOCCHNG', 'HUSBWRKCHNG']
 
   # WMA
-  #selected_feature = ['MR1WBC', 'EATCHNGNEGPOS', 'SEXDIFF', 'FAMCLOSENEGPOS', 'SEPNEGPOS', 'CHURCHCHNG', 'CHURCHCHNGNEGPOS', 'MR1FHY', 'NEWFAMNEGPOS', 'ARGUECHNGNEGPOS', 'FAMCLOSE', 'NEWPLC', 'REUNION', 'NEWPLCNEGPOS', 'REUNIONNEGPOS', 'SEP', 'FAMILL', 'ARGUECHNG', 'FAMILLNEGPOS', 'FINCHNG', 'NEWJOBNEGPOS', 'FINCHNGNEGPOS', 'NEWJOB', 'DISINFECTANT', 'MR1FPOSIT', 'NEWFAM', 'WRKCHNG', 'HUSBWRKCHNG', 'ACIEVENEGPOS', 'VIOL']
+  #selected_features = ['MR1WBC', 'EATCHNGNEGPOS', 'SEXDIFF', 'FAMCLOSENEGPOS', 'SEPNEGPOS', 'CHURCHCHNG', 'CHURCHCHNGNEGPOS', 'MR1FHY', 'NEWFAMNEGPOS', 'ARGUECHNGNEGPOS', 'FAMCLOSE', 'NEWPLC', 'REUNION', 'NEWPLCNEGPOS', 'REUNIONNEGPOS', 'SEP', 'FAMILL', 'ARGUECHNG', 'FAMILLNEGPOS', 'FINCHNG', 'NEWJOBNEGPOS', 'FINCHNGNEGPOS', 'NEWJOB', 'DISINFECTANT', 'MR1FPOSIT', 'NEWFAM', 'WRKCHNG', 'HUSBWRKCHNG', 'ACIEVENEGPOS', 'VIOL']
 
   # OFA
-  #selected_feature = ['FVCURRWT', 'FVBPSYS', 'MR1GESTAGESONW', 'MR1WBC', 'FVURINE', 'FVCURRHT_INCH', 'MR1PLTS', 'FVWATDRINK', 'FVBPDIAS', 'MR1FBS', 'SVHEALTH', 'MR1FPOSIT', 'DATEPRENATCAREM', 'MR1MCHC', 'WKSWHENPREG', 'WATSTORE', 'LAUNDRYPROD', 'ALCDAYS', 'LASTALC', 'MR1BPSYST', 'BUGSV2', 'FVWATCOOK', 'IHV_LOTION', 'MR1FIRSTSONG', 'MR1WGHTLBR', 'WATSTOREMAT', 'ALCDRINKS', 'DRUGUSE', 'FVCHORETIME', 'MARIJUSE']
+  #selected_features = ['FVCURRWT', 'FVBPSYS', 'MR1GESTAGESONW', 'MR1WBC', 'FVURINE', 'FVCURRHT_INCH', 'MR1PLTS', 'FVWATDRINK', 'FVBPDIAS', 'MR1FBS', 'SVHEALTH', 'MR1FPOSIT', 'DATEPRENATCAREM', 'MR1MCHC', 'WKSWHENPREG', 'WATSTORE', 'LAUNDRYPROD', 'ALCDAYS', 'LASTALC', 'MR1BPSYST', 'BUGSV2', 'FVWATCOOK', 'IHV_LOTION', 'MR1FIRSTSONG', 'MR1WGHTLBR', 'WATSTOREMAT', 'ALCDRINKS', 'DRUGUSE', 'FVCHORETIME', 'MARIJUSE']
 
   # CAA
-  selected_feature = ['FVBPDIAS', 'MR1WBC', 'MR1MCHC', 'FVINC', 'CSECTION', 'MR1MCH', 'MR1NEUTRPH', 'MR1PLTS', 'SVHEALTH', 'FVCHORETIME', 'MR1RBC', 'FVCURRWT', 'MR1GESTAGESONW', 'ULTRAGESTAGED_FV', 'RACE__3', 'RACE__2', 'RACE__1', 'HISPORG', 'HISP', 'FVMARSTAT', 'RESIDCHANG', 'RACE__4', 'CHILDNUM', 'FVURINE', 'PATED', 'MR1HCT', 'MEDAORALTYPE', 'SMKQUIT', 'LASTCIG', 'SMKDAILY_MY']
-  if len(selected_feature) != 0:
-    selected_feature = selected_feature + [args[2]]
-    print "Evaluate the selected features"
-    input_data = input_data[selected_feature]
-  accuracy, fnr, fpr, auc = Run(input_data, args[2], int(args[3]))
-  print "Accuracy: ", accuracy
-  print "AUC: ", auc
+  #selected_features = ['FVBPDIAS', 'MR1WBC', 'MR1MCHC', 'FVINC', 'CSECTION', 'MR1MCH', 'MR1NEUTRPH', 'MR1PLTS', 'SVHEALTH', 'FVCHORETIME', 'MR1RBC', 'FVCURRWT', 'MR1GESTAGESONW', 'ULTRAGESTAGED_FV', 'RACE__3', 'RACE__2', 'RACE__1', 'HISPORG', 'HISP', 'FVMARSTAT', 'RESIDCHANG', 'RACE__4', 'CHILDNUM', 'FVURINE', 'PATED', 'MR1HCT', 'MEDAORALTYPE', 'SMKQUIT', 'LASTCIG', 'SMKDAILY_MY']
+
+  #selected_features = ['PPTYPELABOR', 'MR3LYMPHS', 'MR3MONOCTS', 'MR1WBC', 'PPTYPEDEL', 'MR1PLTS', 'PPSTAGETIMING', 'PPBPPARTUMSYST', 'PPRECORD_NUMBER', 'CSECTION', 'MR3NEUTRPH', 'MR1FBS', 'PPHISTPHYS_BP_DIAST', 'MR3RESLUC', 'FVBLOOD', 'CURRBLD1TRIM', 'MR1MONOCTS', 'PPBPADMNSYST', 'CURRBLD2TRIM', 'MR3WBC', 'PPBPADMNDIAST', 'PREVPREGCOMP', 'PUINTERVIEWERV1', 'MR3UCULT', 'MR3MCH', 'MR1DENSD', 'MR3URINALYS', 'FVBPSYS', 'FVBPDIAS', 'PPHISTPHYSC_PULSE']
+
+  #selected_features = ['MR1FPOSIT', 'MR1WBC', 'MR1FBS', 'FVBPSYS', 'BUGSPRY', 'MR1RBC', 'IHV_MOUTHWASH', 'IHV_LOTION', 'MR1PLTS', 'FVCHORETIME', 'WATSTORE', 'DATEPRENATCAREM', 'MR1NEUTRPH', 'MR1MONOCTS', 'WATFILTER', 'FVWATDRINK', 'WATTREAT', 'FVBPDIAS', 'MR1MCV', 'FVWATCOOK', 'STOVE', 'MR1MCHC', 'AGEMENS', 'PREGNUM', 'WTPREPREG', 'CHILDNUM', 'MR1FHY', 'FVHEADACHE', 'FVCURRWT', 'FVCURRHT_INCH']
+
+  selected_features = []
+  accuracy, fnr, fpr, auc = Run(input_data, args[2], int(args[3]), selected_features)
+  # print "Accuracy: ", accuracy
+  # print "AUC: ", auc
 
 
 if __name__ == "__main__":
