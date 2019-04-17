@@ -355,6 +355,8 @@ class Manager:
     local_data.data_columns = local_data.df.columns.to_list()
     local_data.data_indices = local_data.df.index.to_list()
     self.combined_data_by_visit[visitid] = local_data
+    print("The number of rows: "+str(len(self.combined_data_by_visit[visitid].data_indices)))
+    print("The number of columns: " + str(len(self.combined_data_by_visit[visitid].data_columns)))
     print("====Internal Merge Finished...====\n")
 
 
