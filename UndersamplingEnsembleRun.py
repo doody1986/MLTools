@@ -1,5 +1,7 @@
 import TreeEnsembleEval
+import TreeEnsembleFeatureSelection
 import os
+import sys
 import pandas as pd
 
 # Evaluate the performance given different ensemble number across all features
@@ -9,29 +11,69 @@ num_ensembles = [11, 31, 51, 71, 91]
 
 cur_working_path = os.getcwd()
 
-data_v1_v2 = "protect_data_V1_V2.csv"
-data_v1_v2_v3 = "protect_data_V1_V2_V3.csv"
-data_v1_v2_v3_v4 = "protect_data_V1_V2_V3_V4.csv"
+data_v1_v2 = "data_preprocessing/protect_data_V1_V2.csv"
+data_v1_v2_v3 = "data_preprocessing/protect_data_V1_V2_V3.csv"
+data_v1_v2_v3_v4 = "data_preprocessing/protect_data_V1_V2_V3_V4.csv"
 
 data_pathes = []
 data_pathes.append(os.path.join(cur_working_path, data_v1_v2))
 data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3))
 data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3_v4))
 
-num_rounds = 10
+evaluate_ensemble_size = True
+evaluate_feature_selection_method = False
+
+num_rounds = 20
 df1 = pd.DataFrame(columns=['Accuracy', 'AUC', 'Ensemble Size', 'Data File'])
-exp1_filename = "performance_with_various_ensemble_size.csv"
-for data_path in data_pathes:
-  input_data = pd.read_csv(data_path)
-  for num in num_ensembles:
-    final_accuracy = 0.0
-    final_auc = 0.0
-    for i in range(num_rounds):
-      accuracy, fnr, fpr, auc = TreeEnsembleEval.Run(input_data, label_name, num)
-      final_accuracy += accuracy
-      final_auc += auc
-    final_accuracy /= float(num_rounds)
-    final_auc /= float(num_rounds)
-    temp = pd.DataFrame([[final_accuracy, final_auc, num, data_path]], columns=df1.columns)
-    df1 = df1.append(temp, ignore_index=True)
-df1.to_csv(exp1_filename, index=False)
+exp1_filename = "performance_with_different_ensemble_size.csv"
+if evaluate_ensemble_size:
+  for data_path in data_pathes:
+   input_data = pd.read_csv(data_path)
+   for num in num_ensembles:
+     final_accuracy = 0.0
+     final_auc = 0.0
+     for i in range(num_rounds):
+       accuracy, fnr, fpr, auc = TreeEnsembleEval.Run(input_data, label_name, num)
+       final_accuracy += accuracy
+       final_auc += auc
+     final_accuracy /= float(num_rounds)
+     final_auc /= float(num_rounds)
+     temp = pd.DataFrame([[final_accuracy, final_auc, num, data_path]], columns=df1.columns)
+     df1 = df1.append(temp, ignore_index=True)
+  df1.to_csv(exp1_filename, index=False)
+
+method_options = ['CLA', 'WMA', 'OFA', 'CAA']
+num_ensemble_by_data = [51, 71, 91]
+num_selected_features = 20
+
+df2 = pd.DataFrame(columns=['Accuracy', 'AUC', 'Method', 'Data File'])
+exp2_filename = "performance_with_different_method_"+str(num_selected_features)+"features.csv"
+if evaluate_feature_selection_method:
+  for i in range(len(data_pathes)):
+    print("\nIn "+data_pathes[i])
+    input_data = pd.read_csv(data_pathes[i])
+    ensemble_size = num_ensemble_by_data[i]
+    for method in method_options:
+      print("\n\tFeature selection method: " + method)
+      selected_features = TreeEnsembleFeatureSelection.Run(input_data, label_name,
+                                                           ensemble_size, method,
+                                                           num_selected_features)
+      print("\tSelected features: ")
+      print(selected_features)
+      final_accuracy = 0.0
+      final_auc = 0.0
+      for j in range(num_rounds):
+        # Print the progress
+        sys.stdout.write('\r>> Evaluate Progress %.1f%%' % (float(j + 1) / float(num_rounds) * 100.0))
+        sys.stdout.flush()
+        accuracy, fnr, fpr, auc = TreeEnsembleEval.Run(input_data, label_name, ensemble_size, selected_features)
+        final_accuracy += accuracy
+        final_auc += auc
+      final_accuracy /= float(num_rounds)
+      final_auc /= float(num_rounds)
+      temp = pd.DataFrame([[final_accuracy, final_auc, method, data_pathes[i]]], columns=df2.columns)
+      df2 = df2.append(temp, ignore_index=True)
+  df2.to_csv(exp2_filename, index=False)
+
+
+

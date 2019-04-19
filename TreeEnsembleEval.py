@@ -1,25 +1,14 @@
 #! /usr/bin/env python
 
-import math
-import operator
-import time
-import random
-import copy
 import sys
 import ast
-import csv
 import random
 from collections import Counter
-import numpy as np
 from sklearn.model_selection import KFold
 from sklearn import metrics
 from sklearn import tree
 
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mtick
-import matplotlib
-
 import pandas as pd
 
 ##################################################
@@ -40,7 +29,6 @@ def read_data(dataset, input_data, datatypes):
 
   #list features
   dataset.features = input_data.columns.tolist()
-  print "The number of features is: ", len(dataset.features)-1
 
 ##################################################
 # compute tree
@@ -65,7 +53,6 @@ def validate_tree(dataset):
 def Run(input_data, label_name, num_ensemble, selected_features = []):
   if len(selected_features) != 0:
     selected_feature = selected_features + [label_name]
-    print "Evaluate the selected features"
     input_data = input_data[selected_feature]
 
   dataset = data("")
@@ -98,8 +85,8 @@ def Run(input_data, label_name, num_ensemble, selected_features = []):
   positive_samples = filter(lambda x: x[dataset.label_index] == 2, data_samples)
   num_negative = len(negative_samples)
   num_positive = len(positive_samples)
-  print "The number of negative sample is: ", num_negative
-  print "The number of positive sample is: ", num_positive
+  # print "The number of negative sample is: ", num_negative
+  # print "The number of positive sample is: ", num_positive
 
   test_propotion = 0.1
 

@@ -129,7 +129,7 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
 
   # The features
   num_feats = len(dataset.features) - 1
-  print "The number of features is: ", num_feats
+  # print "The number of features is: ", num_feats
 
   #find index of label_name
   for a in range(len(dataset.features)):
@@ -155,8 +155,8 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats):
   positive_samples = filter(lambda x: x[dataset.label_index] == 2, data_samples)
   num_negative = len(negative_samples)
   num_positive = len(positive_samples)
-  print "The number of negative sample is: ", num_negative
-  print "The number of positive sample is: ", num_positive
+  # print "The number of negative sample is: ", num_negative
+  # print "The number of positive sample is: ", num_positive
 
   # No test data is needed during feature selection
   train_idx_positive = range(num_positive)
