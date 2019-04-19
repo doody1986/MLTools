@@ -108,6 +108,8 @@ class Manager:
 
     self.label_updated = False
 
+    self.missing_rate_table = pd.DataFrame(columns=['Features', 'Missing Rate', 'Visit'])
+
   def extract_dd(self):
     print("====Data Dictionary Extraction Starts...====")
     # Human subject data
@@ -391,8 +393,17 @@ class Manager:
       else:
         old_labels.df.loc[idx_in_old_labels, self.label_feature] = label_new
     self.label_updated = True
-    print("====Update label Finished====\n")
+    print("\n====Update label Finished====\n")
 
-
-
+  def calc_missing_rate(self):
+    print("====Calculate Missing Rate...====")
+    for visitid in self.data_map:
+      for data in self.data_map[visitid]:
+        for feat in data.data_columns:
+          null_flags = data.df[feat].isnull()
+          invalid_count = collections.Counter(null_flags)[True]
+          missing_rate = float(invalid_count) / float(len(null_flags))
+          temp = pd.DataFrame([[feat, missing_rate, visitid]], columns=self.missing_rate_table.columns)
+          self.missing_rate_table = self.missing_rate_table.append(temp, ignore_index=True)
+    print("\n====Calculate Missing Rate Finished====\n")
 
