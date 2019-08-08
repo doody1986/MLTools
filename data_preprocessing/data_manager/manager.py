@@ -73,7 +73,7 @@ class Label:
 
 
 class Manager:
-  def __init__(self, data_path_map, data_dictionary_path, label_path, prefill_table_path=''):
+  def __init__(self, data_path_map, data_dictionary_path, label_path, prefill_table_path='', completeness_threshold=0.8):
     # Extract data dictionary
     self.data_dictionary = DataDict(data_dictionary_path)
     self.extract_dd()
@@ -97,9 +97,12 @@ class Manager:
       if visitid not in self.combined_data_by_visit:
         self.combined_data_by_visit[visitid] = None
 
-    self.completeness_threshold = 0.8
+    self.completeness_threshold = completeness_threshold
     self.prefill_table_path = prefill_table_path
-    self.prefill_val_df = pd.read_csv(self.prefill_table_path)
+    if self.prefill_table_path != "":
+      self.prefill_val_df = pd.read_csv(self.prefill_table_path)
+    else:
+      self.prefill_val_df = pd.DataFrame(columns=['Feature', 'Pre-Filled Value', 'Depending Logic'])
     self.study_id_feature = 'SYS_LOC_CODE'
     self.all_visits = ['V1', 'V2', 'V3', 'V4']
     self.label_feature = 'PPTERM'

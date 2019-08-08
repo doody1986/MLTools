@@ -203,38 +203,10 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats, missin
         current_feat = features[idx]
         if current_feat not in feature_accuracy_dict:
           feature_accuracy_dict[current_feat] = 0
-        assert(missing_rate_table is not None, "No missing rate table!!!!!!")
-        missing_rate_table_features = missing_rate_table.columns.to_list()
-        feature_column = missing_rate_table_features[0]
-        missing_rate_column = missing_rate_table_features[1]
-        visitid_column = missing_rate_table_features[2]
-        implicit_visitid = ""
-        if regex_feature_suffix.match(current_feat):
-          current_feat_raw = current_feat[:-2]
-          implicit_visitid = regex_feature_suffix.match(current_feat).group(1)
-        else:
-          current_feat_raw = current_feat
-        missing_rate_list = missing_rate_table[missing_rate_table[
-                                            feature_column]==current_feat_raw][missing_rate_column].to_list()
-        if len(missing_rate_list) > 1:
-          # Multiple visit ID issue
-          if implicit_visitid == "":
-            visitid_options = ['V1', 'V2', 'V3']
-            for opt in visitid_options:
-              if current_feat_raw+opt in features:
-                continue
-              else:
-                implicit_visitid = opt
-                break
 
-          missing_rate = missing_rate_table.loc[missing_rate_table[
-                                            feature_column] == current_feat_raw].loc[missing_rate_table[
-                                            visitid_column] == implicit_visitid][missing_rate_column].to_list()[0]
-        elif len(missing_rate_list) == 1:
-          missing_rate = missing_rate_list[0]
-
+        missing_rate = MissingRate(missing_rate_table, current_feat, features)
         alpha = 1.0
-        beta = 1.0
+        beta = 2.0
         feature_accuracy_dict[current_feat] += accuracy / ((missing_rate + alpha)**beta)
       
   
@@ -269,6 +241,38 @@ def main():
   final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats), missing_rate_table)
   print final_feature_list
 
+def MissingRate(missing_rate_table, current_feat, features):
+  assert(missing_rate_table is not None, "No missing rate table!!!!!!")
+  missing_rate_table_features = missing_rate_table.columns.to_list()
+  feature_column = missing_rate_table_features[0]
+  missing_rate_column = missing_rate_table_features[1]
+  visitid_column = missing_rate_table_features[2]
+  implicit_visitid = ""
+  if regex_feature_suffix.match(current_feat):
+    current_feat_raw = current_feat[:-2]
+    implicit_visitid = regex_feature_suffix.match(current_feat).group(1)
+  else:
+    current_feat_raw = current_feat
+  missing_rate_list = missing_rate_table[missing_rate_table[
+                                      feature_column]==current_feat_raw][missing_rate_column].to_list()
+  if len(missing_rate_list) > 1:
+    # Multiple visit ID issue
+    if implicit_visitid == "":
+      visitid_options = ['V1', 'V2', 'V3']
+      for opt in visitid_options:
+        if current_feat_raw+opt in features:
+          continue
+        else:
+          implicit_visitid = opt
+          break
+
+    missing_rate = missing_rate_table.loc[missing_rate_table[
+                                      feature_column] == current_feat_raw].loc[missing_rate_table[
+                                      visitid_column] == implicit_visitid][missing_rate_column].to_list()[0]
+  elif len(missing_rate_list) == 1:
+    missing_rate = missing_rate_list[0]
+
+  return missing_rate
 
 if __name__ == "__main__":
   main()

@@ -3,6 +3,7 @@ import TreeEnsembleFeatureSelection
 import os
 import sys
 import pandas as pd
+import datetime
 
 # Evaluate the performance given different ensemble number across all features
 selected_features = []
@@ -10,6 +11,10 @@ label_name = "PPTERM"
 num_ensembles = [11, 31, 51, 71, 91]
 
 cur_working_path = os.getcwd()
+
+today = datetime.datetime.now().strftime("%m%d%Y")
+
+extension = ".csv"
 
 data_v1_v2 = "data_preprocessing/protect_data_V1_V2.csv"
 data_v1_v2_v3 = "data_preprocessing/protect_data_V1_V2_V3.csv"
@@ -20,12 +25,12 @@ data_pathes.append(os.path.join(cur_working_path, data_v1_v2))
 data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3))
 data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3_v4))
 
-evaluate_ensemble_size = True
-evaluate_feature_selection_method = False
+evaluate_ensemble_size = False
+evaluate_feature_selection_method = True
 
 num_rounds = 20
 df1 = pd.DataFrame(columns=['Accuracy', 'AUC', 'Ensemble Size', 'Data File'])
-exp1_filename = "performance_with_different_ensemble_size.csv"
+exp2_filename = "performance_with_different_ensemble_size_"+today+extension
 if evaluate_ensemble_size:
   for data_path in data_pathes:
    input_data = pd.read_csv(data_path)
@@ -42,12 +47,16 @@ if evaluate_ensemble_size:
      df1 = df1.append(temp, ignore_index=True)
   df1.to_csv(exp1_filename, index=False)
 
-method_options = ['CLA', 'WMA', 'OFA', 'CAA']
-num_ensemble_by_data = [51, 71, 91]
+# method_options = ['CLA', 'WMA', 'OFA', 'CAA', 'MAA']
+method_options = ['MAA']
+missing_rate_table_path = "data_preprocessing/missing_rate_table.csv"
+missing_rate_table = pd.read_csv(missing_rate_table_path)
+num_ensemble_by_data = [91, 91, 91]
 num_selected_features = 20
 
 df2 = pd.DataFrame(columns=['Accuracy', 'AUC', 'Method', 'Data File'])
-exp2_filename = "performance_with_different_method_"+str(num_selected_features)+"features.csv"
+# exp2_filename = "performance_with_different_method_"+str(num_selected_features)+"features.csv"
+exp2_filename = "performance_with_MAA_"+str(num_selected_features)+"features_"+today+extension
 if evaluate_feature_selection_method:
   for i in range(len(data_pathes)):
     print("\nIn "+data_pathes[i])
@@ -57,7 +66,8 @@ if evaluate_feature_selection_method:
       print("\n\tFeature selection method: " + method)
       selected_features = TreeEnsembleFeatureSelection.Run(input_data, label_name,
                                                            ensemble_size, method,
-                                                           num_selected_features)
+                                                           num_selected_features,
+                                                           missing_rate_table)
       print("\tSelected features: ")
       print(selected_features)
       final_accuracy = 0.0

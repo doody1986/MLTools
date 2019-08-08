@@ -78,7 +78,7 @@ def handler(data, categorical_features, checkbox_features, numberical_features, 
 
   # Missing data handling
   print("Handling missing data")
-  num_try = 100
+  num_try = 150
   for i in range(num_sample):
     # Print the progress
     sys.stdout.write('\r>> Progress %.1f%%' % (float(i + 1) / float(num_sample) * 100.0))

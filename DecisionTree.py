@@ -569,8 +569,6 @@ def Run(input_data, label_name, max_num_features, method):
   arg3 = label_name
   if (arg3 in dataset.features):
     label_name = arg3
-  else:
-    label_name = dataset.features[-1]
 
   dataset.label_name = label_name
 
@@ -578,8 +576,6 @@ def Run(input_data, label_name, max_num_features, method):
   for a in range(len(dataset.features)):
     if dataset.features[a] == dataset.label_name:
       dataset.label_index = a
-    else:
-      dataset.label_index = range(len(dataset.features))[-1]
       
   # Split the data set into training and test set
   training_dataset = data(label_name)
@@ -589,13 +585,9 @@ def Run(input_data, label_name, max_num_features, method):
   for a in range(len(dataset.features)):
     if training_dataset.features[a] == training_dataset.label_name:
       training_dataset.label_index = a
-    else:
-      training_dataset.label_index = range(len(training_dataset.features))[-1]
   for a in range(len(dataset.features)):
     if test_dataset.features[a] == test_dataset.label_name:
       test_dataset.label_index = a
-    else:
-      test_dataset.label_index = range(len(test_dataset.features))[-1]
 
   data_samples = dataset.examples
   random.shuffle(data_samples)
