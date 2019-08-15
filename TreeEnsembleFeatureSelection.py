@@ -16,6 +16,8 @@ from sklearn.feature_selection import RFE
 import numpy as np
 import pandas as pd
 
+import data_preprocessing.data_manager.util
+
 regex_feature_suffix = re.compile(r".*(V\d)$")
 
 ##################################################
@@ -123,7 +125,8 @@ def extract_selected_feat_idx(raw_scores, num_selected_feats):
 # need to account for missing data
 ##################################################
 
-def Run(input_data, label_name, num_ensemble, method, num_selected_feats, missing_rate_table = None):
+def Run(input_data, label_name, num_ensemble, method, num_selected_feats,
+        missing_rate_table = None, entropy_table = None):
 
   dataset = data("")
   read_data(dataset, input_data)
@@ -208,6 +211,18 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats, missin
         alpha = 1.0
         beta = 2.0
         feature_accuracy_dict[current_feat] += accuracy / ((missing_rate + alpha)**beta)
+    if method == "EAA":
+      # missing rate weighted accuracy aggregation
+      feat_idx = extract_selected_feat_idx(ranks, num_selected_feats)
+      for idx in feat_idx:
+        current_feat = features[idx]
+        if current_feat not in feature_accuracy_dict:
+          feature_accuracy_dict[current_feat] = 0
+
+        delta_entropy = DeltaEntropy(input_data, entropy_table, current_feat, features)
+        alpha = 1.0
+        beta = 2.0
+        feature_accuracy_dict[current_feat] += accuracy / ((delta_entropy + alpha)**beta)
       
   
   if method == "OFA":
@@ -216,7 +231,7 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats, missin
   if method == "CLA" or  method == "WMA":
     feat_idx = extract_selected_feat_idx(final_feature_rank, num_selected_feats)
     final_feature_list = [features[i] for i in feat_idx]
-  if method == "CAA" or method == "MAA":
+  if method == "CAA" or method == "MAA" or method == "EAA":
     final_feature_list = sorted(feature_accuracy_dict, key=feature_accuracy_dict.get, reverse=True)
 
   return final_feature_list[:num_selected_feats]
@@ -237,12 +252,15 @@ def main():
   num_selected_feats = args[5]
   missing_rate_table_path = args[6]
   missing_rate_table = pd.read_csv(missing_rate_table_path)
+  entropy_table_path = args[7]
+  entropy_table = pd.read_csv(entropy_table_path)
   print "The feature selection method is: ", method
-  final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats), missing_rate_table)
+  final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats),
+                           missing_rate_table, entropy_table)
   print final_feature_list
 
 def MissingRate(missing_rate_table, current_feat, features):
-  assert(missing_rate_table is not None, "No missing rate table!!!!!!")
+  assert missing_rate_table is not None, "No missing rate table!!!!!!"
   missing_rate_table_features = missing_rate_table.columns.to_list()
   feature_column = missing_rate_table_features[0]
   missing_rate_column = missing_rate_table_features[1]
@@ -273,6 +291,43 @@ def MissingRate(missing_rate_table, current_feat, features):
     missing_rate = missing_rate_list[0]
 
   return missing_rate
+
+
+def DeltaEntropy(input_data, entropy_table, current_feat, features):
+  assert entropy_table is not None, "No entropy table!!!!!!"
+  entropy_table_features = entropy_table.columns.to_list()
+  feature_column = entropy_table_features[0]
+  entropy_column = entropy_table_features[1]
+  visitid_column = entropy_table_features[2]
+  implicit_visitid = ""
+  if regex_feature_suffix.match(current_feat):
+    current_feat_raw = current_feat[:-2]
+    implicit_visitid = regex_feature_suffix.match(current_feat).group(1)
+  else:
+    current_feat_raw = current_feat
+  entropy_list = entropy_table[entropy_table[
+                                      feature_column]==current_feat_raw][entropy_column].to_list()
+  if len(entropy_list) > 1:
+    # Multiple visit ID issue
+    if implicit_visitid == "":
+      visitid_options = ['V1', 'V2', 'V3']
+      for opt in visitid_options:
+        if current_feat_raw+opt in features:
+          continue
+        else:
+          implicit_visitid = opt
+          break
+
+    original_entropy = entropy_table.loc[entropy_table[
+                                      feature_column] == current_feat_raw].loc[entropy_table[
+                                      visitid_column] == implicit_visitid][entropy_column].to_list()[0]
+  elif len(entropy_list) == 1:
+    original_entropy = entropy_list[0]
+
+  feat_val_list = input_data[current_feat].tolist()
+  new_entropy = data_preprocessing.data_manager.util.entropy(feat_val_list)
+
+  return abs(new_entropy - original_entropy)
 
 if __name__ == "__main__":
   main()

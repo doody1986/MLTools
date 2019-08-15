@@ -16,7 +16,7 @@ today = datetime.datetime.now().strftime("%m%d%Y")
 
 extension = ".csv"
 
-completeness_ratios = [80]
+completeness_ratios = [50, 60, 70, 80]
 
 data_pathes = []
 for ratio in completeness_ratios:
@@ -49,10 +49,12 @@ if evaluate_ensemble_size:
      df1 = df1.append(temp, ignore_index=True)
   df1.to_csv(exp1_filename, index=False)
 
-# method_options = ['CLA', 'WMA', 'OFA', 'CAA', 'MAA']
-method_options = ['MAA']
+# method_options = ['CLA', 'WMA', 'OFA', 'CAA', 'MAA', 'EAA']
+method_options = ['EAA']
 missing_rate_table_path = "data_preprocessing/missing_rate_table.csv"
 missing_rate_table = pd.read_csv(missing_rate_table_path)
+entropy_table_path = "data_preprocessing/entropy_table.csv"
+entropy_table = pd.read_csv(entropy_table_path)
 num_ensemble_by_data = [91, 91, 91]
 num_selected_features = 20
 
@@ -69,7 +71,8 @@ if evaluate_feature_selection_method:
       selected_features = TreeEnsembleFeatureSelection.Run(input_data, label_name,
                                                            ensemble_size, method,
                                                            num_selected_features,
-                                                           missing_rate_table)
+                                                           missing_rate_table,
+                                                           entropy_table)
       print("\tSelected features: ")
       print(selected_features)
       missing_rate = 0.0

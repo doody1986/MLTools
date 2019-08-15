@@ -6,6 +6,8 @@ import copy
 import sys
 import os
 
+import util
+
 
 logic_regex_str = r"\[(\w+)\]\s?(=|<>|<|>|>=|<=)\s?'(\d+)'\s?(or|and)?"
 regex_checkbox_feature = re.compile(r".*(__)\d+")
@@ -112,6 +114,7 @@ class Manager:
     self.label_updated = False
 
     self.missing_rate_table = pd.DataFrame(columns=['Features', 'Missing Rate', 'Visit'])
+    self.entropy_table = pd.DataFrame(columns=['Features', 'Entropy', 'Visit'])
 
   def extract_dd(self):
     print("====Data Dictionary Extraction Starts...====")
@@ -256,7 +259,7 @@ class Manager:
             data.df.loc[idx, feature] = prefill_val
           if condition_comp == ">=" and data.df.loc[idx, condition_feat] < int(condition_val):
             data.df.loc[idx, feature] = prefill_val
-          assert(not pd.isnull(data.df.loc[idx, feature]), "Still NAN")
+          assert not pd.isnull(data.df.loc[idx, feature]), "Still NAN"
         elif len(matches) == 2:
           # Ignore so far TBD
           continue
@@ -409,4 +412,16 @@ class Manager:
           temp = pd.DataFrame([[feat, missing_rate, visitid]], columns=self.missing_rate_table.columns)
           self.missing_rate_table = self.missing_rate_table.append(temp, ignore_index=True)
     print("\n====Calculate Missing Rate Finished====\n")
+
+  def calc_entropy(self):
+    print("====Calculate Entropy...====")
+    for visitid in self.data_map:
+      for data in self.data_map[visitid]:
+        for feat in data.data_columns:
+          feat_vals = data.df[feat].tolist()
+          feat_vals = [val for val in feat_vals if not np.isnan(val)]
+          entropy = util.entropy(feat_vals)
+          temp = pd.DataFrame([[feat, entropy, visitid]], columns=self.entropy_table.columns)
+          self.entropy_table = self.entropy_table.append(temp, ignore_index=True)
+    print("\n====Calculate Entropy Finished====\n")
 
