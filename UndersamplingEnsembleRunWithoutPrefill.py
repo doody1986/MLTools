@@ -5,6 +5,33 @@ import sys
 import datetime
 import pandas as pd
 
+from data_preprocessing.config.parser import *
+from data_preprocessing.data_manager.manager import *
+
+#os.chdir('data_preprocessing')
+#
+## Read configuration
+#read_config()
+#print(config_.data_dict)
+#print(config_.data_path_map)
+#print(config_.label_file)
+#
+#completeness_threshold = 0.5
+#
+## Setup a data manager
+#manager = Manager(config_.data_path_map,
+#                  config_.data_dict, config_.label_file, "", completeness_threshold)
+#
+## Update the label first
+#manager.update_label()
+#
+## Filter for all
+#manager.filter_all()
+#
+#dm = manager.data_map
+#
+#os.chdir('..')
+
 # Evaluate the performance given different ensemble number across all features
 selected_features = []
 label_name = "PPTERM"
@@ -20,11 +47,11 @@ completeness_ratios = [50, 60, 70, 80]
 
 data_pathes = []
 for ratio in completeness_ratios:
-  data_v1_v2 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2.csv"
-  data_v1_v2_v3 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3.csv"
+  # data_v1_v2 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2.csv"
+  # data_v1_v2_v3 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3.csv"
   data_v1_v2_v3_v4 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3_V4.csv"
-  data_pathes.append(os.path.join(cur_working_path, data_v1_v2))
-  data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3))
+  # data_pathes.append(os.path.join(cur_working_path, data_v1_v2))
+  # data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3))
   data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3_v4))
 
 evaluate_ensemble_size = False
@@ -81,6 +108,12 @@ if evaluate_feature_selection_method:
                                                                  input_data.columns.to_list())
       missing_rate /= float(num_selected_features)
       print("Averaged missing rate of selected features: "+str(missing_rate))
+      entroy_diff = 0.0
+      for sfeat in selected_features:
+        entroy_diff += TreeEnsembleFeatureSelection.DeltaEntropy(input_data, entropy_table, sfeat,
+                                                                 input_data.columns.to_list())
+      entroy_diff /= float(num_selected_features)
+      print("Averaged entroy difference of selected features: " + str(entroy_diff))
       final_accuracy = 0.0
       final_auc = 0.0
       for j in range(num_rounds):

@@ -126,7 +126,7 @@ def extract_selected_feat_idx(raw_scores, num_selected_feats):
 ##################################################
 
 def Run(input_data, label_name, num_ensemble, method, num_selected_feats,
-        missing_rate_table = None, entropy_table = None):
+        missing_rate_table = None, entropy_table = None, manager_datamap = None):
 
   dataset = data("")
   read_data(dataset, input_data)
@@ -220,9 +220,21 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats,
           feature_accuracy_dict[current_feat] = 0
 
         delta_entropy = DeltaEntropy(input_data, entropy_table, current_feat, features)
-        alpha = 1.0
+        alpha = 0.5
         beta = 2.0
         feature_accuracy_dict[current_feat] += accuracy / ((delta_entropy + alpha)**beta)
+    if method == "NAA":
+      # missing rate weighted accuracy aggregation
+      feat_idx = extract_selected_feat_idx(ranks, num_selected_feats)
+      for idx in feat_idx:
+        current_feat = features[idx]
+        if current_feat not in feature_accuracy_dict:
+          feature_accuracy_dict[current_feat] = 0
+
+        nmi = NMI(input_data, manager_datamap, current_feat)
+        alpha = 1.0
+        beta = 2.0
+        feature_accuracy_dict[current_feat] += accuracy * nmi
       
   
   if method == "OFA":
@@ -231,7 +243,7 @@ def Run(input_data, label_name, num_ensemble, method, num_selected_feats,
   if method == "CLA" or  method == "WMA":
     feat_idx = extract_selected_feat_idx(final_feature_rank, num_selected_feats)
     final_feature_list = [features[i] for i in feat_idx]
-  if method == "CAA" or method == "MAA" or method == "EAA":
+  if method == "CAA" or method == "MAA" or method == "EAA" or method == "NAA":
     final_feature_list = sorted(feature_accuracy_dict, key=feature_accuracy_dict.get, reverse=True)
 
   return final_feature_list[:num_selected_feats]
@@ -254,9 +266,10 @@ def main():
   missing_rate_table = pd.read_csv(missing_rate_table_path)
   entropy_table_path = args[7]
   entropy_table = pd.read_csv(entropy_table_path)
+  manager_datamap = args[8]
   print "The feature selection method is: ", method
   final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats),
-                           missing_rate_table, entropy_table)
+                           missing_rate_table, entropy_table, manager_datamap)
   print final_feature_list
 
 def MissingRate(missing_rate_table, current_feat, features):
@@ -328,6 +341,35 @@ def DeltaEntropy(input_data, entropy_table, current_feat, features):
   new_entropy = data_preprocessing.data_manager.util.entropy(feat_val_list)
 
   return abs(new_entropy - original_entropy)
+
+
+def NMI(input_data, manager_datamap, current_feat):
+
+  implicit_visitid = ""
+  if regex_feature_suffix.match(current_feat):
+    current_feat_raw = current_feat[:-2]
+    implicit_visitid = regex_feature_suffix.match(current_feat).group(1)
+  else:
+    current_feat_raw = current_feat
+
+  # Multiple visit ID issue
+  if implicit_visitid == "":
+    for visitid in manager_datamap:
+      for data in manager_datamap[visitid]:
+        for feat in data.data_columns:
+          if feat != current_feat_raw:
+            continue
+          feat_vals_before = data.df[feat].tolist()
+          feat_vals_before = [val for val in feat_vals_before if not np.isnan(val)]
+  else:
+    feat_vals_before = manager_datamap[implicit_visitid][current_feat_raw]
+
+  feat_vals_after = input_data[current_feat].tolist()
+  nmi = data_preprocessing.data_manager.util.NormMI(feat_vals_before, feat_vals_after, 2)
+  print(nmi)
+  exit()
+
+  return nmi
 
 if __name__ == "__main__":
   main()

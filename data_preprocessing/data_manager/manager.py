@@ -114,6 +114,8 @@ class Manager:
     self.label_updated = False
 
     self.missing_rate_table = pd.DataFrame(columns=['Features', 'Missing Rate', 'Visit'])
+
+    # Before data preprocessing
     self.entropy_table = pd.DataFrame(columns=['Features', 'Entropy', 'Visit'])
 
   def extract_dd(self):

@@ -11,7 +11,7 @@ class Config:
 # A global configutration object
 config_ = Config()
 
-def read_config():
+def read_config(path=''):
   # Prompt information
   prompt_info = \
   """ 
