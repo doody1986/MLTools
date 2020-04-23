@@ -8,9 +8,9 @@ def merger(combined_data_by_visit, study_id_feature, visit_list, label_updated,
            need_verify = False, datamap = None):
   print("====Merging Starts...====")
   # Get the first data from visit_list
-  assert(len(visit_list) > 1, "More than one visit data are needed!!!")
-  assert(len(combined_data_by_visit) > 0,
-         "The combined data for each visit cannot be empty! Internal merges are needed first!!!")
+  #assert(len(visit_list) > 1, "More than one visit data are needed!!!")
+  #assert(len(combined_data_by_visit) > 0,
+  #       "The combined data for each visit cannot be empty! Internal merges are needed first!!!")
   visitid_left = visit_list[0]
   data = combined_data_by_visit[visitid_left].df
   for idx in range(1, len(visit_list)):

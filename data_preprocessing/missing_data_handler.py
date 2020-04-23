@@ -17,7 +17,7 @@ def one_hot_encoding(data, categorical_features, checkbox_features):
     if "999" in column:
       list_999.append(column)
   if len(list_888) != len(list_999):
-    print "Do not make sense!!"
+    print("Do not make sense!!")
     exit()
   for i in range(len(list_888)):
     data[list_999[i]] = data[list_999[i]] | data[list_888[i]]
@@ -96,7 +96,28 @@ def handler(data, categorical_features, checkbox_features, numberical_features, 
             data.loc[indices[i], f] = data[f][sorted_index[num]]
             break
         if np.isnan(data[f][indices[i]]):
-          print "Number of try is not enough"
+          print("Number of try is not enough")
           exit()
+  print("\n====Missing Data Handling Finished...====\n")
+  return data
+
+def handler1(data, categorical_features, checkbox_features, numberical_features, study_id_feature):
+  print("====Missing Data Handling Starts...====")
+  features = data.columns.tolist()
+  indices = data.index.tolist()
+  # Initialize the similarity matrix
+  # similarity_mat = []
+  # for i in range(num_sample):
+  #   similarity_mat.append([-999999]*num_sample)
+
+  # Missing data handling
+  print("Handling missing data")
+  means = data.mean(axis = 0)
+
+  for f in features:
+    # Print the progress
+    # sys.stdout.write('\r>> Progress %.1f%%' % (float(i + 1) / float(num_sample) * 100.0))
+    # sys.stdout.flush()
+    data[f].fillna(means[f], inplace=True)
   print("\n====Missing Data Handling Finished...====\n")
   return data
