@@ -1,0 +1,12 @@
+#! /bin/sh
+
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 11 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 31 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 51 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 71 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 91 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 111 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 131 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 151 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 191 CAA 20
+python TreeEnsemble.py data_preprocessing/protect_data_no_prefill_80_V1_V2_V3_V4_baseline.csv PPTERM 211 CAA 20

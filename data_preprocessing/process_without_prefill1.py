@@ -3,7 +3,7 @@ from data_manager.manager import *
 import missing_data_handler
 import merger
 
-completeness_threshold = 0.8
+completeness_threshold = 0.5
 
 filename_prefix = "protect_data_no_prefill_"+str(int(completeness_threshold*100))
 
@@ -60,7 +60,7 @@ for opt in visit_options:
                                          opt, manager.label_updated)
 
   if manager.processed_data is not None:
-    manager.processed_data.to_csv(filename+".csv", index=False)
+    manager.processed_data.to_csv(filename+"_baseline.csv", index=False)
   manager.processed_data = None
 
 

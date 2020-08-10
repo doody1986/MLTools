@@ -262,18 +262,19 @@ def main():
   input_data = pd.read_csv(args[1])
   method = args[4]
   num_selected_feats = args[5]
-  missing_rate_table_path = args[6]
-  missing_rate_table = pd.read_csv(missing_rate_table_path)
-  entropy_table_path = args[7]
-  entropy_table = pd.read_csv(entropy_table_path)
-  manager_datamap = args[8]
+  #missing_rate_table_path = args[6]
+  #missing_rate_table = pd.read_csv(missing_rate_table_path)
+  #entropy_table_path = args[7]
+  #entropy_table = pd.read_csv(entropy_table_path)
+  #manager_datamap = args[8]
   print "The feature selection method is: ", method
-  final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats),
-                           missing_rate_table, entropy_table, manager_datamap)
+  final_feature_list = Run(input_data, args[2], int(args[3]), method, int(num_selected_feats))
+  #                         missing_rate_table, entropy_table, manager_datamap)
   print final_feature_list
 
 def MissingRate(missing_rate_table, current_feat, features):
-  assert missing_rate_table is not None, "No missing rate table!!!!!!"
+  if missing_rate_table.empty:
+    return
   missing_rate_table_features = missing_rate_table.columns.to_list()
   feature_column = missing_rate_table_features[0]
   missing_rate_column = missing_rate_table_features[1]

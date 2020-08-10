@@ -49,7 +49,7 @@ data_pathes = []
 for ratio in completeness_ratios:
   # data_v1_v2 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2.csv"
   # data_v1_v2_v3 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3.csv"
-  data_v1_v2_v3_v4 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3_V4.csv"
+  data_v1_v2_v3_v4 = "data_preprocessing/protect_data_no_prefill_"+str(ratio)+"_V1_V2_V3_V4_baseline.csv"
   # data_pathes.append(os.path.join(cur_working_path, data_v1_v2))
   # data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3))
   data_pathes.append(os.path.join(cur_working_path, data_v1_v2_v3_v4))
@@ -57,7 +57,7 @@ for ratio in completeness_ratios:
 evaluate_ensemble_size = False
 evaluate_feature_selection_method = True
 
-num_rounds = 20
+num_rounds = 100
 df1 = pd.DataFrame(columns=['Accuracy', 'AUC', 'Ensemble Size', 'Data File'])
 exp1_filename = "no_prefill_performance_with_different_ensemble_size_"+today+extension
 if evaluate_ensemble_size:
@@ -76,8 +76,8 @@ if evaluate_ensemble_size:
      df1 = df1.append(temp, ignore_index=True)
   df1.to_csv(exp1_filename, index=False)
 
-# method_options = ['CLA', 'WMA', 'OFA', 'CAA', 'MAA', 'EAA']
-method_options = ['EAA']
+#method_options = ['CLA', 'WMA', 'OFA', 'CAA', 'MAA', 'EAA']
+method_options = ['OFA', 'CAA', 'MAA', 'EAA']
 missing_rate_table_path = "data_preprocessing/missing_rate_table.csv"
 missing_rate_table = pd.read_csv(missing_rate_table_path)
 entropy_table_path = "data_preprocessing/entropy_table.csv"

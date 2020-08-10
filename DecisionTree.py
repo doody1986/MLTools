@@ -493,7 +493,7 @@ def visualize_tree(root, max_height):
 node_id = 0
 def build_tree_graph(graph, node, graph_node, edge_label, max_height):
   if node.is_leaf == True or node.height == max_height:
-    global node_id
+    #global node_id
     node_id += 1
     if node.classification == 2:
       leaf_label = "Pre-term"
@@ -507,7 +507,7 @@ def build_tree_graph(graph, node, graph_node, edge_label, max_height):
     edge = pydot.Edge(graph_node, leaf, label=edge_label)
     graph.add_edge(edge)
   else:
-    global node_id
+    #global node_id
     node_label = node.feat_split+" >= "+str(node.feat_split_value)+"\n"+\
                  "NumPos "+str(node.num_pos)+" NumNeg "+str(node.num_neg)+"\n"+\
                  "AUC "+str(round(node.metric, 2))
@@ -540,7 +540,7 @@ def prune_tree_graph(graph, node, graph_node, edge_label, max_height):
     edge = pydot.Edge(graph_node, leaf, label=edge_label)
     graph.add_edge(edge)
   else:
-    global node_id
+    #global node_id
     node_label = node.feat_split+" >= "+str(node.feat_split_value)+"\n"+\
                  "NumPos "+str(node.num_pos)+" NumNeg "+str(node.num_neg)+"\n"+\
                  "AUC "+str(round(node.metric, 2))
